@@ -4,6 +4,6 @@
     "types": ["bun"],
     "noEmit": true
   },
-  "include": ["src/**/*", "scripts/**/*"],
+  "include": [".astro/types.d.ts", "src/**/*", "scripts/**/*"],
   "exclude": ["dist", "public/wasm"]
 }

@@ -12,6 +12,13 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # The local collector is the v3 format; see vendor/README.md.
+      - dependency-name: "@fingerprintjs/fingerprintjs"
+        versions: [">=4"]
+      # Astro 7 is still on compiler 2.x for frontmatter positions.
+      - dependency-name: "@astrojs/compiler"
+        versions: [">=3"]
     groups:
       minor-and-patch:
         update-types: [minor, patch]

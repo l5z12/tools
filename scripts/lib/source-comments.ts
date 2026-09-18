@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import ts from "typescript";
 import { parse } from "@astrojs/compiler";
 
 export type Comment = {
@@ -9,30 +8,74 @@ export type Comment = {
   closing: string;
 };
 
-function typescriptComments(source: string): Comment[] {
-  const file = ts.createSourceFile(
-    "source.ts",
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-  );
-  const ranges = new Map<number, Comment>();
-  const collect = (range: ts.CommentRange) => {
-    const block = range.kind === ts.SyntaxKind.MultiLineCommentTrivia;
-    ranges.set(range.pos, {
-      start: range.pos,
-      end: range.end,
-      opening: block ? "/*" : "//",
-      closing: block ? "*/" : "",
-    });
+function javascriptComments(source: string): Comment[] {
+  const comments: Comment[] = [];
+  const scan = (offset: number, until?: string): number => {
+    while (offset < source.length) {
+      if (until && source.startsWith(until, offset)) return offset;
+      const character = source[offset];
+      if (character === "`") {
+        offset = scanTemplate(offset + 1);
+        continue;
+      }
+      if (character === '"' || character === "'") {
+        offset++;
+        while (offset < source.length) {
+          if (source[offset] === "\\") offset += 2;
+          else if (source[offset++] === character) break;
+        }
+        continue;
+      }
+      if (source.startsWith("//", offset)) {
+        const end = source.indexOf("\n", offset);
+        const lineEnd = end === -1 ? source.length : end;
+        comments.push({
+          start: offset,
+          end: lineEnd,
+          opening: "//",
+          closing: "",
+        });
+        offset = lineEnd;
+        continue;
+      }
+      if (source.startsWith("/*", offset)) {
+        const start = offset;
+        const close = source.indexOf("*/", offset + 2);
+        if (close === -1) throw Error("Unterminated block comment.");
+        comments.push({
+          start,
+          end: close + 2,
+          opening: "/*",
+          closing: "*/",
+        });
+        offset = close + 2;
+        continue;
+      }
+      if (until === "}" && character === "{") {
+        offset = scan(offset + 1, "}") + 1;
+        continue;
+      }
+      offset++;
+    }
+    return offset;
   };
-  const visit = (node: ts.Node) => {
-    ts.getLeadingCommentRanges(source, node.getFullStart())?.forEach(collect);
-    ts.getTrailingCommentRanges(source, node.end)?.forEach(collect);
-    node.getChildren(file).forEach(visit);
+  const scanTemplate = (offset: number): number => {
+    while (offset < source.length) {
+      if (source[offset] === "\\") {
+        offset += 2;
+        continue;
+      }
+      if (source[offset] === "`") return offset + 1;
+      if (source.startsWith("${", offset)) {
+        offset = scan(offset + 2, "}") + 1;
+        continue;
+      }
+      offset++;
+    }
+    throw Error("Unterminated template string.");
   };
-  visit(file);
-  return [...ranges.values()];
+  scan(0);
+  return comments;
 }
 
 /** Rust raw strings and nested comments need different rules from JavaScript. */
@@ -142,7 +185,7 @@ async function astroComments(source: string): Promise<Comment[]> {
       if (node.type === "frontmatter") {
         const contentStart = source.indexOf("\n", start) + 1;
         const contentEnd = source.lastIndexOf("---", end);
-        for (const comment of typescriptComments(
+        for (const comment of javascriptComments(
           source.slice(contentStart, contentEnd),
         )) {
           comments.push({
@@ -167,7 +210,7 @@ async function astroComments(source: string): Promise<Comment[]> {
           const content = source.slice(contentStart, contentEnd);
           const embedded =
             embeddedLanguage === "typescript"
-              ? typescriptComments(content)
+              ? javascriptComments(content)
               : cStyleComments(content, "css");
           for (const comment of embedded)
             comments.push({
@@ -198,6 +241,6 @@ export async function sourceComments(
     case ".css":
       return cStyleComments(source, "css");
     default:
-      return typescriptComments(source);
+      return javascriptComments(source);
   }
 }
