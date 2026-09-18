@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { SuiteOptions, SuiteResult } from "../workbench-types";
 import { armTimeout, overLimit } from "../limits";
+import { t } from "../i18n";
 
 let activeCancel: (() => void) | undefined;
 export function cancelGo(): void {
@@ -11,11 +12,11 @@ export function configureGo(container: HTMLElement): void {
   const status = document.createElement("p");
   status.dataset.goStatus = "";
   status.setAttribute("role", "status");
-  status.textContent = "Go loads on the first run.";
+  status.textContent = t("goLoading");
   const stop = document.createElement("button");
   stop.type = "button";
   stop.dataset.goStop = "";
-  stop.textContent = "Stop Go";
+  stop.textContent = t("stopGo");
   stop.disabled = true;
   stop.onclick = cancelGo;
   container.append(status, stop);
@@ -67,7 +68,7 @@ export async function runGo(
         if (data.type === "status") status.textContent = data.text;
         else if (data.type === "error") reject(Error(data.error));
         else if (data.type === "result") {
-          status.textContent = `Finished · ${data.version}`;
+          status.textContent = t("goFinished", { version: data.version });
           resolve(data.result);
         }
       };

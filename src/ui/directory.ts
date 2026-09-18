@@ -3,6 +3,7 @@ import type { Tool } from "../lib/tool-types";
 import { matchesTool } from "../lib/search";
 import { element } from "./dom";
 import { toolPath } from "../lib/site";
+import { formatNumber, localizedTool, t, toolCountLabel } from "../i18n";
 
 export const commonTags = new Set([
   "developer",
@@ -73,10 +74,10 @@ export function configureDirectory(
     all.setAttribute("aria-pressed", String(selectedTags.size === 0));
     more.setAttribute("aria-expanded", String(expanded));
     more.textContent = expanded
-      ? "Fewer hashtags"
-      : `All ${tagButtons.length} hashtags`;
+      ? t("fewerHashtags")
+      : t("allHashtags", { n: formatNumber(tagButtons.length) });
     clear.hidden = !search.value && selectedTags.size === 0;
-    count.textContent = `${matches} ${matches === 1 ? "tool" : "tools"}`;
+    count.textContent = toolCountLabel(matches);
     noResults.hidden = matches > 0;
     if (open) index.open = true;
   }
@@ -170,9 +171,9 @@ export function configureDirectory(
     root.replaceChildren();
     root.hidden = visible.length === 0;
     if (root.hidden) return;
-    root.append(element("span", "Recent"));
+    root.append(element("span", t("recent")));
     for (const toolId of visible) {
-      const link = element("a", byId.get(toolId)!.name);
+      const link = element("a", localizedTool(byId.get(toolId)!).name);
       link.href = toolPath(toolId);
       link.dataset.tool = toolId;
       root.append(link);
@@ -189,6 +190,16 @@ export function configureDirectory(
       recent.unshift(id);
       recent.splice(6);
       renderRecent(id);
+    },
+    refresh(): void {
+      filter(false);
+      renderRecent(
+        document.getElementById("start-page")!.hidden
+          ? document.querySelector<HTMLElement>(
+              "[data-tool][aria-current='true']",
+            )?.dataset.tool
+          : undefined,
+      );
     },
   };
 }

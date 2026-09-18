@@ -5,6 +5,7 @@ import {
   renderSuite,
   clearSuite,
   downloadSuite,
+  refreshSuiteLocale,
   workbenchIds,
 } from "./workbench-ui";
 import { suiteCore } from "./workbench-core";
@@ -20,6 +21,17 @@ import { configureDirectory } from "./ui/directory";
 import { TextDrafts } from "./ui/drafts";
 import { updatePageMetadata } from "./ui/page-metadata";
 import { toolPath } from "./lib/site";
+import {
+  applyDocumentMessages,
+  applyLocalizedCatalog,
+  cycleLanguagePreference,
+  ensureLocale,
+  formatNumber,
+  languageButtonLabel,
+  localizedTool,
+  t,
+  themeButtonLabel,
+} from "./i18n";
 import { archiveAliases } from "./lib/archive-tools";
 import {
   configureAnimation,
@@ -67,25 +79,26 @@ function updateFileLimitLabel(): void {
     document.querySelector<HTMLLabelElement>('label[for="file"]');
   if (!fileLabel || !current) return;
   if (formBypassLimits()) {
-    fileLabel.textContent = "Choose file";
+    fileLabel.textContent = t("chooseFile");
     return;
   }
   fileLabel.textContent =
-    current.id === "hex-viewer"
-      ? "Choose file (maximum 1 MiB)"
-      : "Choose file (maximum 32 MB)";
+    current.id === "hex-viewer" ? t("chooseFile1MiB") : t("chooseFile32");
 }
 function updateRunState(): void {
   $("run").disabled = !current || !ready || busy;
-  $("run-label").textContent = busy ? "Working…" : "Run tool";
+  $("run-label").textContent = busy ? t("working") : t("runTool");
   $("tool-form").setAttribute("aria-busy", String(busy));
 }
 function updateInputSummary(): void {
   const input = $("input");
   $("input-summary").hidden = input.hidden;
   const lines = input.value ? input.value.split("\n").length : 0;
-  $("input-summary").textContent =
-    `${input.value.length.toLocaleString()} characters · ${lines.toLocaleString()} ${lines === 1 ? "line" : "lines"}`;
+  $("input-summary").textContent = t("inputSummary", {
+    n: formatNumber(input.value.length),
+    lines: formatNumber(lines),
+    lineLabel: lines === 1 ? t("line") : t("lines"),
+  });
 }
 function forgetClear(): void {
   clearedText = undefined;
@@ -108,11 +121,11 @@ function clearResult() {
   $("empty-result").hidden = false;
   $("output").value = "";
   clearTimeout(copyFeedback);
-  $("copy").textContent = "Copy";
+  $("copy").textContent = t("copy");
   $("copy").disabled = true;
   $("download").disabled = true;
   $("error").hidden = true;
-  $("result-status").textContent = "Ready when you are.";
+  $("result-status").textContent = t("readyWhenYouAre");
 }
 function fail(message: string) {
   clearTimeout(timeout);
@@ -121,7 +134,7 @@ function fail(message: string) {
   if (!current) return;
   $("error").textContent = message;
   $("error").hidden = false;
-  $("result-status").textContent = "Check the message above and try again.";
+  $("result-status").textContent = t("checkMessage");
   $("error").focus();
 }
 function result(value: string) {
@@ -142,8 +155,7 @@ function renderOutput(value: string, formatted: boolean) {
     $("result-view").hidden = false;
     if (value.length > 65536) {
       const note = document.createElement("p");
-      note.textContent =
-        "Preview limited to 65,536 characters. Copy and Download retain the complete formatted output.";
+      note.textContent = t("previewLimited");
       $("result-view").append(note);
     }
   }
@@ -162,15 +174,16 @@ function renderOutput(value: string, formatted: boolean) {
   }
   $("output").hidden = rich;
   $("toggle-raw").hidden = !rich;
-  $("toggle-raw").textContent = "Show raw output";
+  $("toggle-raw").textContent = t("showRaw");
   clearTimeout(timeout);
   busy = false;
   updateRunState();
   $("output").value = value;
   $("copy").disabled = false;
   $("download").disabled = false;
-  $("result-status").textContent =
-    `Done · ${new TextEncoder().encode(value).length.toLocaleString()} bytes · processed locally`;
+  $("result-status").textContent = t("doneBytes", {
+    n: formatNumber(new TextEncoder().encode(value).length),
+  });
   $("error").hidden = true;
 }
 function startWorker() {
@@ -180,7 +193,7 @@ function startWorker() {
   worker.onmessage = ({ data }) => {
     if (data.ready) {
       ready = true;
-      $("engine-status").textContent = "Ready · runs locally";
+      $("engine-status").textContent = t("readyLocal");
       updateRunState();
       if (current && isReferenceBrowser(current.id) && !busy) execute();
       return;
@@ -188,8 +201,8 @@ function startWorker() {
     if (data.fatal) {
       console.error("WebAssembly initialization failed:", data.fatal);
       ready = false;
-      $("engine-status").textContent = "Unable to load";
-      fail("The WebAssembly core could not load. Reload the page to retry.");
+      $("engine-status").textContent = t("unableToLoad");
+      fail(t("wasmFailed"));
       return;
     }
     if (data.request !== request) return;
@@ -198,8 +211,8 @@ function startWorker() {
   };
   worker.onerror = () => {
     ready = false;
-    $("engine-status").textContent = "Unable to load";
-    fail("The processing worker failed. Reload the page to retry.");
+    $("engine-status").textContent = t("unableToLoad");
+    fail(t("workerFailed"));
   };
 }
 function saveDraft(): void {
@@ -234,9 +247,7 @@ function select(id: string): void {
   if (archiveMode) id = "archive-workbench";
   const found = tools.find((t) => t.id === id);
   if (!found) {
-    showHome(
-      id ? "That tool link is unavailable. Search or choose a tool below." : "",
-    );
+    showHome(id ? t("toolUnavailable") : "");
     return;
   }
   if (location.pathname !== toolPath(found.id))
@@ -246,7 +257,7 @@ function select(id: string): void {
   const draft = drafts.read(found.id);
   forgetClear();
   clearTimeout(linkFeedback);
-  $("copy-tool-link").textContent = "Copy link";
+  $("copy-tool-link").textContent = t("copyLink");
   current = found;
   $("workspace").hidden = false;
   $("start-page").hidden = true;
@@ -255,8 +266,8 @@ function select(id: string): void {
   clearTimeout(timeout);
   updateRunState();
   clearResult();
-  $("tool-title").textContent = current.name;
-  $("description").textContent = current.description;
+  $("tool-title").textContent = localizedTool(current).name;
+  $("description").textContent = localizedTool(current).description;
   $("tool-category").textContent =
     current.tags?.map((t) => "#" + t).join(" ") ?? "";
   $("input").value = draft?.input ?? current.sample;
@@ -268,7 +279,8 @@ function select(id: string): void {
       ? 7
       : 2;
   $("option").value = draft?.option ?? current.option;
-  $("option-label").textContent = current.optionLabel;
+  $("option-label").textContent =
+    localizedTool(current).optionLabel || t("options");
   $("option-field").hidden = !current.optionLabel;
   const unitSelect = document.getElementById(
     "unit-select",
@@ -306,10 +318,10 @@ function select(id: string): void {
   }
   if (isReferenceBrowser(current.id)) $("input").rows = 1;
   $("input").placeholder = isReferenceBrowser(current.id)
-    ? "Search codes, names, or message words…"
+    ? t("searchReferencePlaceholder")
     : "";
   document.querySelector<HTMLLabelElement>('label[for="input"]')!.textContent =
-    isReferenceBrowser(current.id) ? "Search reference" : "Input";
+    isReferenceBrowser(current.id) ? t("searchReference") : t("input");
   $("tool-form").hidden = false;
   updatePageMetadata(current);
   document
@@ -326,7 +338,7 @@ async function execute() {
   clearResult();
   busy = true;
   updateRunState();
-  $("result-status").textContent = "Working…";
+  $("result-status").textContent = t("working");
   const ticket = ++request;
   const limits = { bypassLimits: formBypassLimits() };
   try {
@@ -371,9 +383,9 @@ async function execute() {
     }
     if (current.id === "hex-viewer") {
       const file = $("file").files?.[0];
-      if (!file) throw Error("Choose a file first.");
+      if (!file) throw Error(t("chooseFileFirst"));
       if (overLimit(file.size, 1024 * 1024, limits))
-        throw Error("Hex viewer accepts files up to 1 MiB.");
+        throw Error(t("hexViewerLimit"));
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (ticket !== request) return;
       let binary = "";
@@ -389,9 +401,9 @@ async function execute() {
     }
     if (current.id === "file-sha256") {
       const file = $("file").files?.[0];
-      if (!file) throw Error("Choose a file first.");
+      if (!file) throw Error(t("chooseFileFirst"));
       if (overLimit(file.size, 32 * 1024 * 1024, limits))
-        throw Error("File exceeds the 32 MB limit.");
+        throw Error(t("file32Limit"));
       const value = await suiteCore(
         "file-sha256",
         "",
@@ -411,7 +423,7 @@ async function execute() {
       () => {
         worker.terminate();
         ready = false;
-        fail("Processing exceeded 10 seconds. Try a smaller input.");
+        fail(t("processingTimeout"));
         startWorker();
       },
       10000,
@@ -483,23 +495,22 @@ $("file").addEventListener("animationchange", invalidate);
 $("toggle-raw").onclick = () => {
   $("output").hidden = !$("output").hidden;
   $("toggle-raw").textContent = $("output").hidden
-    ? "Show raw output"
-    : "Hide raw output";
+    ? t("showRaw")
+    : t("hideRaw");
 };
 $("copy").onclick = async () => {
   try {
     await navigator.clipboard.writeText($("output").value);
-    $("result-status").textContent = "Copied to clipboard.";
-    $("copy").textContent = "Copied";
+    $("result-status").textContent = t("copiedClipboard");
+    $("copy").textContent = t("copied");
     clearTimeout(copyFeedback);
     copyFeedback = setTimeout(() => {
-      $("copy").textContent = "Copy";
+      $("copy").textContent = t("copy");
     }, 2000);
   } catch {
     $("output").hidden = false;
     $("output").select();
-    $("result-status").textContent =
-      "Select and copy the result manually; clipboard access is unavailable.";
+    $("result-status").textContent = t("clipboardManual");
   }
 };
 $("download").onclick = () => {
@@ -560,16 +571,14 @@ $("copy-tool-link").onclick = async () => {
     await navigator.clipboard.writeText(
       new URL(toolPath(current.id), location.origin).href,
     );
-    $("copy-tool-link").textContent = "Link copied";
+    $("copy-tool-link").textContent = t("linkCopied");
     clearTimeout(linkFeedback);
     linkFeedback = setTimeout(() => {
-      $("copy-tool-link").textContent = "Copy link";
+      $("copy-tool-link").textContent = t("copyLink");
     }, 2000);
-    $("result-status").textContent =
-      "Tool link copied. Your inputs are not included.";
+    $("result-status").textContent = t("toolLinkCopied");
   } catch {
-    $("result-status").textContent =
-      "Copy the tool link from your address bar.";
+    $("result-status").textContent = t("copyFromAddressBar");
   }
 };
 function readRoute(): void {
@@ -600,11 +609,56 @@ document.querySelectorAll<HTMLAnchorElement>("[data-home]").forEach((link) => {
     window.scrollTo({ top: 0, behavior: "instant" });
   });
 });
+function applyLocaleChrome(): void {
+  applyDocumentMessages();
+  applyLocalizedCatalog(tools);
+  $("language").textContent = languageButtonLabel();
+  $("theme").textContent = themeButtonLabel(theme);
+  updateFileLimitLabel();
+  updateRunState();
+  updateInputSummary();
+  if (current) {
+    const localized = localizedTool(current);
+    $("tool-title").textContent = localized.name;
+    $("description").textContent = localized.description;
+    $("option-label").textContent = localized.optionLabel || t("options");
+    $("input").placeholder = isReferenceBrowser(current.id)
+      ? t("searchReferencePlaceholder")
+      : "";
+    document.querySelector<HTMLLabelElement>(
+      'label[for="input"]',
+    )!.textContent = isReferenceBrowser(current.id)
+      ? t("searchReference")
+      : t("input");
+    $("copy-tool-link").textContent = t("copyLink");
+    clearTimeout(linkFeedback);
+    refreshSuiteLocale();
+  }
+  if (!$("output").hidden || !$("result-view").hidden)
+    $("toggle-raw").textContent = $("output").hidden
+      ? t("showRaw")
+      : t("hideRaw");
+  if (!$("copy").disabled && $("copy").textContent !== t("copied"))
+    $("copy").textContent = t("copy");
+  updatePageMetadata(current);
+  directory.refresh();
+  if (ready) $("engine-status").textContent = t("readyLocal");
+  else $("engine-status").textContent = t("gettingReady");
+  if ($("error").hidden && $("empty-result").hidden && $("output").value)
+    $("result-status").textContent = t("doneBytes", {
+      n: formatNumber(new TextEncoder().encode($("output").value).length),
+    });
+  else if (!$("error").hidden)
+    $("result-status").textContent = t("checkMessage");
+  else if (current) $("result-status").textContent = t("readyWhenYouAre");
+  else $("result-status").textContent = t("resultMeta");
+}
+
 let theme = document.documentElement.dataset.theme || "auto";
 function applyTheme() {
   if (theme === "auto") delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = theme;
-  $("theme").textContent = `Theme: ${theme[0].toUpperCase() + theme.slice(1)}`;
+  $("theme").textContent = themeButtonLabel(theme);
   try {
     localStorage.setItem("l5z12-theme", theme);
   } catch {}
@@ -615,7 +669,13 @@ $("theme").onclick = () => {
   )[theme];
   applyTheme();
 };
+$("language").onclick = () => {
+  cycleLanguagePreference();
+  applyLocaleChrome();
+};
+ensureLocale();
 applyTheme();
+applyLocaleChrome();
 readRoute();
 startWorker();
 if (document.modelContext?.registerTool) {

@@ -29,5 +29,16 @@ import { contentSecurityPolicy } from "../lib/security";
       </p>
       <a href="/">Browse all tools →</a>
     </main>
+    <script is:inline>
+      try {
+        if (document.documentElement.lang === "zh-CN") {
+          document.title = "页面不存在 — L5Z12 Tools";
+          document.querySelector("h1").textContent = "页面不存在";
+          document.querySelector("main p:not(.muted)").textContent =
+            "该工具链接不可用。请到目录中搜索你需要的工具。";
+          document.querySelector("main a").textContent = "浏览全部工具 →";
+        }
+      } catch {}
+    </script>
   </body>
 </html>

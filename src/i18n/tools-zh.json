@@ -1,0 +1,2216 @@
+{
+  "sql-runner": {
+    "name": "SQLite 查询运行器",
+    "description": "在本地 SQLite 数据库上运行 SQL，查看结果，并保存更新后的数据库。",
+    "help": "SQLite 在首次运行时于本地加载。每次运行都从所选数据库或空库重新开始；下载结果以保留修改。限制：数据库 32 MiB、SQL 2 MiB、30 秒、1,000 条语句、返回 5,000 行。停止会取消任务。SQL 不会连接任何服务器。",
+    "fields": {
+      "parameters": "绑定参数（JSON 数组或命名对象）"
+    }
+  },
+  "sql-schema": {
+    "name": "SQLite .db 文件查看器",
+    "description": "打开 .db、.sqlite 或 .sqlite3 文件。浏览表与视图、筛选行、查看 schema 并导出数据。",
+    "help": "选择 SQLite 文件并运行以读取其中的表。选择表或视图后再次运行即可浏览。本地只读检查；每次运行最多 32 MiB、30 秒。可导出当前页，或最多 5,000 行匹配结果（4 MiB）。JSON 保留 NULL、精确整数与 blob 字节；CSV 会为类似公式的文本加前缀以便电子表格使用，NULL 用空单元格表示。文本匹配对 ASCII 不区分大小写。不支持加密数据库与单独的 WAL 文件；请使用完整的 SQLite 备份。",
+    "fields": {
+      "table": "表或视图",
+      "filter": "在任意列中查找文本",
+      "sort": "排序列",
+      "direction": "排序方向",
+      "pageSize": "每页行数",
+      "page": "页码",
+      "exportScope": "导出行"
+    }
+  },
+  "sql-explain": {
+    "name": "SQLite 查询计划",
+    "description": "说明 SQLite 如何扫描表、使用索引并执行查询。",
+    "help": "SQLite 在首次运行时于本地加载。每次运行都从所选数据库或空库重新开始；下载结果以保留修改。限制：数据库 32 MiB、SQL 2 MiB、30 秒、1,000 条语句、返回 5,000 行。停止会取消任务。SQL 不会连接任何服务器。",
+    "fields": {
+      "setup": "准备 SQL（在查询前运行）",
+      "parameters": "绑定参数（JSON 数组或命名对象）",
+      "mode": "计划详细程度"
+    }
+  },
+  "sql-integrity": {
+    "name": "SQLite 完整性检查器",
+    "description": "检查数据库结构与外键违规，不修改原始文件。",
+    "help": "SQLite 在首次运行时于本地加载。每次运行都从所选数据库或空库重新开始；下载结果以保留修改。限制：数据库 32 MiB、SQL 2 MiB、30 秒、1,000 条语句、返回 5,000 行。停止会取消任务。SQL 不会连接任何服务器。",
+    "fields": {
+      "mode": "检查项"
+    }
+  },
+  "sql-inspect": {
+    "name": "SQL 语法与 AST 查看器",
+    "description": "按所选方言解析 SQL，列出语句并浏览语法树。",
+    "help": "只检查语法，不检查表是否存在、类型或权限。语法树使用所选解析器方言。",
+    "fields": {
+      "dialect": "SQL 方言"
+    }
+  },
+  "sql-normalize": {
+    "name": "SQL 规范化器",
+    "description": "解析并以统一语法重新输出 SQL，每行一条语句。",
+    "help": "会删除注释，包括优化器提示。这是同一方言内的规范化，不是方言翻译。",
+    "fields": {
+      "dialect": "SQL 方言"
+    }
+  },
+  "sql-tokens": {
+    "name": "SQL 词法查看器",
+    "description": "检查 SQL 词法标记、注释、占位符及其源码位置。",
+    "fields": {
+      "dialect": "SQL 方言"
+    }
+  },
+  "sql-json-inserts": {
+    "name": "JSON → SQL INSERT",
+    "description": "由扁平 JSON 对象数组生成带引号的 INSERT 语句。",
+    "help": "缺失字段变为 NULL。嵌套对象与数组会被拒绝。超出 JSON 数字精度的精确小数值请使用字符串。",
+    "fields": {
+      "dialect": "SQL 方言",
+      "table": "表名（单个标识符）"
+    }
+  },
+  "sql-csv-inserts": {
+    "name": "CSV → SQL INSERT",
+    "description": "将 CSV 表头与行转为 SQL INSERT，保留单元格文本与前导零。",
+    "help": "除与 NULL 标记完全匹配外，所有单元格都作为带引号的字符串。空单元格仍为空字符串。",
+    "fields": {
+      "dialect": "SQL 方言",
+      "table": "表名（单个标识符）",
+      "delimiter": "分隔符",
+      "nullToken": "NULL 标记（留空则禁用）"
+    }
+  },
+  "sql-in-list": {
+    "name": "SQL IN 列表生成器",
+    "description": "将标量值的 JSON 数组转为安全加引号的 SQL 值列表。",
+    "help": "只生成带括号的列表。NULL 遵循 SQL 三值逻辑；需要时请单独使用 IS NULL。空列表会被拒绝。",
+    "fields": {
+      "dialect": "SQL 方言"
+    }
+  },
+  "cpp-runner": {
+    "name": "C/C++ 编译与运行",
+    "description": "将 C 或 C++ 编译为 WebAssembly，用 stdin 运行，并保存编译后的程序。",
+    "help": "实验性 Clang/LLD 8.0.1，在本地运行，并附带 C/C++ 头文件与库。单源文件；C99–C17 与 C++11–C++17。无法访问文件系统、外部库、操作系统线程或异常处理。导出的程序使用旧版 wasi_unstable 导入。资源按需加载（编译/运行约 57 MiB）。限制：源码与 stdin 各 1 MiB，60 秒，程序内存 256 MiB，每个输出流 256 KiB。",
+    "fields": {
+      "standard": "语言标准",
+      "optimization": "优化",
+      "action": "操作",
+      "stdin": "标准输入"
+    }
+  },
+  "cpp-check": {
+    "name": "C/C++ 语法与类型检查",
+    "description": "使用 Clang 检查源码类型、语法与警告，不运行程序。",
+    "help": "实验性 Clang/LLD 8.0.1，在本地运行，并附带 C/C++ 头文件与库。单源文件；C99–C17 与 C++11–C++17。无法访问文件系统、外部库、操作系统线程或异常处理。导出的程序使用旧版 wasi_unstable 导入。资源按需加载（编译/运行约 57 MiB）。限制：源码与 stdin 各 1 MiB，60 秒，程序内存 256 MiB，每个输出流 256 KiB。",
+    "fields": {
+      "standard": "语言标准"
+    }
+  },
+  "cpp-preprocess": {
+    "name": "C/C++ 预处理器",
+    "description": "使用 Clang 展开宏、条件编译与捆绑的头文件。",
+    "help": "实验性 Clang/LLD 8.0.1，在本地运行，并附带 C/C++ 头文件与库。单源文件；C99–C17 与 C++11–C++17。无法访问文件系统、外部库、操作系统线程或异常处理。导出的程序使用旧版 wasi_unstable 导入。资源按需加载（编译/运行约 57 MiB）。限制：源码与 stdin 各 1 MiB，60 秒，程序内存 256 MiB，每个输出流 256 KiB。预处理输出上限 1 MiB。",
+    "fields": {
+      "standard": "语言标准"
+    }
+  },
+  "cpp-assembly": {
+    "name": "C/C++ 转 WebAssembly 汇编",
+    "description": "查看 Clang 在不同优化级别生成的 WebAssembly 汇编。",
+    "help": "实验性 Clang/LLD 8.0.1，在本地运行，并附带 C/C++ 头文件与库。单源文件；C99–C17 与 C++11–C++17。无法访问文件系统、外部库、操作系统线程或异常处理。导出的程序使用旧版 wasi_unstable 导入。资源按需加载（编译/运行约 57 MiB）。限制：源码与 stdin 各 1 MiB，60 秒，程序内存 256 MiB，每个输出流 256 KiB。汇编输出上限 1 MiB。",
+    "fields": {
+      "standard": "语言标准",
+      "optimization": "优化"
+    }
+  },
+  "cpp-format": {
+    "name": "C/C++ 格式化",
+    "description": "用 clang-format 预设或你自己的 .clang-format 配置格式化源码。",
+    "help": "clang-format 23.1.0 首次使用时加载。在可停止的 worker 中本地运行。源码上限 1 MiB。",
+    "fields": {
+      "language": "语言",
+      "style": "风格",
+      "customStyle": "自定义 .clang-format（选择 Custom 时）"
+    }
+  },
+  "cpp-demangle": {
+    "name": "C++ 符号还原",
+    "description": "解码 GCC/Clang Itanium 与 Microsoft C++ 修饰名。",
+    "help": "每行一个符号。支持 Itanium 与 MSVC 编码；无法解码的符号仍会显示。最多 2,000 个符号，每个 8 KiB。"
+  },
+  "cpp-compilation-db": {
+    "name": "编译数据库查看器",
+    "description": "浏览 compile_commands.json 条目、包含路径、宏定义、标准与构建变体。",
+    "help": "最多检查 10,000 条 / 2 MiB。从 arguments 数组提取常见标志；命令字符串与响应文件引用会原样保留，不会做 shell 解析、抓取或执行。"
+  },
+  "cpp-cmake-cache": {
+    "name": "CMake 缓存查看器",
+    "description": "读取带类型的缓存条目及其说明，可选包含内部变量。",
+    "help": "读取 CMakeCache.txt，不求值 CMake 代码。值保持为字符串。限制：2 MiB / 显示 10,000 条。",
+    "fields": {
+      "internal": "包含内部与静态条目"
+    }
+  },
+  "cpp-diagnostics": {
+    "name": "C/C++ 诊断日志读取器",
+    "description": "将 GCC、Clang 与 MSVC 的文件诊断转为结构化、可复制的表格。",
+    "help": "读取已有的 file:line 或 file(line,column) 诊断，每条最多包含八行上下文。限制：2 MiB / 10,000 条诊断。"
+  },
+  "cpp-byte-array": {
+    "name": "文件转 C/C++ 字节数组",
+    "description": "将文件字节或 UTF-8 文本嵌入为 C 数组或 constexpr C++ std::array。",
+    "help": "最多 64 KiB。保留每个字节并写出明确长度。空的 C 数组使用占位存储，逻辑长度为 0。",
+    "fields": {
+      "name": "变量名",
+      "language": "输出语言",
+      "uppercase": "十六进制大写",
+      "terminator": "追加空字节"
+    }
+  },
+  "go-format": {
+    "name": "Go 格式化",
+    "description": "用 gofmt 格式化 Go 源码与片段。",
+    "help": "在本地运行。Go WebAssembly 首次使用时加载。文本上限 2 MiB；每次运行 30 秒。"
+  },
+  "go-source": {
+    "name": "Go 源码查看器",
+    "description": "检查语法，并浏览包、导入、声明与方法签名。",
+    "help": "使用 Go 解析器做语法分析；不解析导入、不检查类型、不执行代码。文本上限 2 MiB。"
+  },
+  "go-ast": {
+    "name": "Go 语法树",
+    "description": "浏览带源码位置与标记值的 Go 抽象语法树。",
+    "help": "展开 AST 节点以检查表达式与声明。限制：20,000 个节点、128 层、源码 2 MiB。"
+  },
+  "go-mod": {
+    "name": "go.mod 查看与格式化",
+    "description": "检查模块要求、替换、排除、撤回与工具链版本。",
+    "help": "在本地运行。Go WebAssembly 首次使用时加载。文本上限 2 MiB；每次运行 30 秒。",
+    "fields": {
+      "action": "操作"
+    }
+  },
+  "go-work": {
+    "name": "go.work 查看与格式化",
+    "description": "检查或格式化 Go 工作区及其本地模块替换。",
+    "help": "在本地运行。Go WebAssembly 首次使用时加载。文本上限 2 MiB；每次运行 30 秒。",
+    "fields": {
+      "action": "操作"
+    }
+  },
+  "go-sum": {
+    "name": "go.sum 查看器",
+    "description": "读取校验和条目，并检测格式错误、重复或冲突记录。",
+    "help": "验证条目结构与 h1 编码。不会拉取模块，也不会用这些哈希核对其内容。文本上限 2 MiB。"
+  },
+  "go-test-results": {
+    "name": "Go 测试报告",
+    "description": "浏览 go test -json 结果、失败、跳过的测试、耗时与捕获的输出。",
+    "help": "读取已有的 go test -json 输出；不会运行测试。限制：30,000 个事件、输入 2 MiB、捕获输出 128 KiB。"
+  },
+  "go-coverage": {
+    "name": "Go 覆盖率报告",
+    "description": "按文件计算语句覆盖率，并查看已覆盖或未覆盖的源码块。",
+    "help": "读取 go test -coverprofile 输出。计算覆盖率前会合并重复位置。限制：20,000 个块、2 MiB。"
+  },
+  "go-benchmarks": {
+    "name": "Go 基准报告",
+    "description": "汇总重复基准测量的最小值、中位数与最大值。",
+    "help": "粘贴 go test -bench . -benchmem 输出。基准名称、单位与上下文分开保留；给出描述性统计，而非显著性检验。"
+  },
+  "go-build-tags": {
+    "name": "Go 构建约束求值",
+    "description": "求值 go:build 表达式，并转换为旧版 +build 约束。",
+    "help": "请显式提供每个已启用标签，包括 OS、架构、发行标签和 cgo。只求值表达式；不会加入文件名约束或隐含平台标签。",
+    "fields": {
+      "tags": "已启用标签（空格或逗号分隔）"
+    }
+  },
+  "go-module-version": {
+    "name": "Go 模块版本查看器",
+    "description": "解码语义版本与伪版本，包括提交修订与时间戳。",
+    "help": "在本地运行。Go WebAssembly 首次使用时加载。文本上限 2 MiB；每次运行 30 秒。"
+  },
+  "go-build-info": {
+    "name": "Go 二进制构建信息",
+    "description": "从可执行文件读取嵌入的 Go 版本、依赖、替换与构建设置。",
+    "help": "选择不超过 32 MiB 的 Go 可执行文件（ELF、PE、Mach-O、Plan 9 或 XCOFF）。读取嵌入的元数据，不执行文件。Go 的 build-info 读取器不支持 Wasm 二进制。"
+  },
+  "dev-har": {
+    "name": "HAR 请求分析器",
+    "description": "检查捕获的 HTTP 请求、状态码、大小与耗时；最慢的排在前面。",
+    "help": "最多 10,000 个请求。时长为累计值，不是页面加载时间。未知的正文大小保持未知。URL 仅作为文本显示；请求不会被重放。每个输入最多 8 MiB。"
+  },
+  "dev-source-map": {
+    "name": "Source map 位置查找",
+    "description": "将生成的 JavaScript 位置映射回原始源码及嵌入的源码行。",
+    "help": "支持常规 v3 map 以及含嵌入分区的 indexed map。行号从 1 开始；UTF-16 列号从 0 开始。使用同一行上最近的前一段。从不抓取外部源码 URL。每个输入最多 8 MiB。",
+    "fields": {
+      "line": "生成代码行号（从 1 开始）",
+      "column": "生成代码列号（从 0 开始）"
+    }
+  },
+  "dev-protobuf": {
+    "name": "Protobuf 线格式查看器",
+    "description": "无需 schema 即可读取字段号、线类型、字节偏移、varint 与载荷字节。",
+    "help": "粘贴十六进制或选择二进制文件。整数按无符号显示；有符号、ZigZag、浮点、packed 与嵌套解释需要 schema。UTF-8 只是候选解释。支持 group；最多 10,000 个字段。每个输入最多 8 MiB。"
+  },
+  "dev-msgpack-inspect": {
+    "name": "MessagePack 查看器",
+    "description": "以树形浏览 MessagePack 的 map、数组、二进制载荷与扩展值。",
+    "help": "粘贴十六进制字节对或选择二进制文件。以带类型的树展示，包括非字符串 map 键，以及用十进制字符串表示的精确整数。接受单个值，最多 64 层、50,000 个节点。每个输入最多 8 MiB。"
+  },
+  "dev-json-msgpack": {
+    "name": "JSON → MessagePack",
+    "description": "将 JSON 编码为 MessagePack 二进制，并查看其十六进制表示。",
+    "help": "生成 .msgpack 文件。支持 JSON 值；二进制与扩展值不在 JSON 类型系统内。每个输入最多 8 MiB。"
+  },
+  "dev-cbor-inspect": {
+    "name": "CBOR 查看器",
+    "description": "以树形浏览 CBOR 值、标签、字节串、数组与 map。",
+    "help": "粘贴十六进制字节对或选择二进制文件。以带类型的树展示，包括非字符串 map 键，以及用十进制字符串表示的精确整数。接受单个值，最多 64 层、50,000 个节点。每个输入最多 8 MiB。"
+  },
+  "dev-json-cbor": {
+    "name": "JSON → CBOR",
+    "description": "将 JSON 编码为 CBOR 二进制，并查看其十六进制表示。",
+    "help": "从 JSON 兼容值生成 .cbor 文件。输出不宣称是规范 CBOR。每个输入最多 8 MiB。"
+  },
+  "dev-json-keys": {
+    "name": "JSON 重复键检测",
+    "description": "查找重复的对象键，包括转义等价形式与嵌套重复。",
+    "help": "用转义后的 JSON Pointer 报告每次重复出现。键在 JSON 反转义后比较。最多 100,000 个值；不会静默覆盖重复键。每个输入最多 8 MiB。"
+  },
+  "dev-merge-patch": {
+    "name": "JSON Merge Patch",
+    "description": "将 RFC 7396 合并补丁应用到 JSON 文档。",
+    "help": "对象中的 null 成员会删除属性。数组与非对象补丁会替换现有值；这与 JSON Patch 的操作列表不同。每个输入最多 8 MiB。",
+    "fields": {
+      "patch": "合并补丁"
+    }
+  },
+  "dev-sse": {
+    "name": "Server-sent events 查看器",
+    "description": "将 SSE 流解析为事件名、ID、数据载荷与重试设置。",
+    "help": "粘贴捕获的 text/event-stream 响应。空行派发事件；ID 会保持，数据行用换行拼接，未完成的尾部数据会报告。不会打开实时连接。最多 10,000 个事件。每个输入最多 8 MiB。"
+  },
+  "dev-git-patch": {
+    "name": "Git 补丁统计",
+    "description": "按文件统计增删与 hunk，并附带重命名与二进制变更元数据。",
+    "help": "接受双向 Git unified diff，包括 git format-patch 输出。检查 hunk 长度。文件路径保持补丁中的写法。不支持 combined merge diff；不解码二进制内容。每个输入最多 8 MiB。"
+  },
+  "dev-permissions": {
+    "name": "Unix 权限解码",
+    "description": "将八进制权限解码为 rwx、setuid、setgid 与 sticky 位。",
+    "help": "输入数字权限，例如 644、755 或 1777。只解释权限位；ACL、所有权与平台行为仍可能影响访问。每个输入最多 8 MiB。"
+  },
+  "everyday-recipe": {
+    "name": "食谱份量换算",
+    "description": "按不同份数缩放食材用量。",
+    "help": "输入含 ingredient,quantity,unit 列的 CSV。数量可接受小数或如 1/2 的分数。单位不变；烹饪时间不缩放。",
+    "fields": {
+      "original": "原始份数",
+      "desired": "目标份数"
+    }
+  },
+  "everyday-bill": {
+    "name": "账单与小费分摊",
+    "description": "均分账单，并保证每一分都有着落。",
+    "help": "每行一位参与者。金额使用同一货币的两位小数。小费四舍五入到分；余下的分给靠前的参与者。",
+    "fields": {
+      "amount": "小计",
+      "tax": "税额",
+      "tip": "小费百分比（税前）"
+    }
+  },
+  "everyday-unit-price": {
+    "name": "单价比较",
+    "description": "按单位比较包装价格，最便宜的排在前面。",
+    "help": "CSV 列：item,price,quantity。每一行使用相同货币与数量单位（例如克）。"
+  },
+  "everyday-print": {
+    "name": "打印尺寸与 DPI 计算器",
+    "description": "计算给定实体打印尺寸所需的像素尺寸。",
+    "help": "像素尺寸向上取整。未压缩 RGB 大小按每像素三字节估算，不含文件头与压缩。",
+    "fields": {
+      "width": "宽度",
+      "height": "高度",
+      "unit": "单位",
+      "dpi": "每英寸像素数"
+    }
+  },
+  "everyday-reading-time": {
+    "name": "阅读与口语时长",
+    "description": "按你选择的语速估算一段文字的阅读或口述时间。",
+    "help": "估算使用 Unicode 词边界与你提供的语速；不含停顿与表达风格。",
+    "fields": {
+      "reading": "阅读语速（词/分钟）",
+      "speaking": "口语语速（词/分钟）"
+    }
+  },
+  "everyday-business-days": {
+    "name": "工作日计数",
+    "description": "统计日期之间的工作日，并排除你的节假日列表。",
+    "help": "包含开始日期。周末为周六和周日。排除日期每行一个；不会自动加入地区节假日。最多 100 年。",
+    "fields": {
+      "start": "开始日期（YYYY-MM-DD）",
+      "end": "结束日期（YYYY-MM-DD）",
+      "inclusive": "包含结束日期"
+    }
+  },
+  "everyday-timesheet": {
+    "name": "工时表计算器",
+    "description": "汇总班次工时，包含休息与跨夜工作。",
+    "help": "CSV 列：date,start,end,break_minutes。使用 24 小时制 HH:MM。结束时间早于开始表示次日；时间相同表示零小时。按墙上时钟计算，不含时区或夏令时变化。"
+  },
+  "everyday-decision": {
+    "name": "加权决策矩阵",
+    "description": "按你的准则、分数与相对权重给选项排序。",
+    "help": "CSV 第一列是选项名称；其余列为 0 到 10 的分数，越高越好。为每项准则提供一个非负权重。权重会自动归一化。",
+    "fields": {
+      "weights": "准则权重（按列顺序）"
+    }
+  },
+  "everyday-calendar": {
+    "name": "日历事件文件",
+    "description": "创建可导入日历应用的 .ics 事件文件。",
+    "help": "输入为事件说明。时间明确为 UTC；日历应用会按本地时区显示。只创建文件，不发送邀请。",
+    "fields": {
+      "title": "事件标题",
+      "start": "开始时间 UTC（YYYY-MM-DDTHH:MM）",
+      "end": "结束时间 UTC（YYYY-MM-DDTHH:MM）",
+      "location": "地点"
+    }
+  },
+  "everyday-csv-transpose": {
+    "name": "CSV 转置",
+    "description": "交换 CSV 的行列，且不丢失带引号的值。",
+    "help": "所有行必须有相同列数。第一行也作为数据转置。最多 1,000 行、100 列。"
+  },
+  "everyday-checklist": {
+    "name": "清单进度",
+    "description": "汇总 Markdown 清单中已完成与剩余的任务。",
+    "help": "读取 - [ ]、- [x] 与 - [X] 任务（也支持 * 与 + 列表），以上一个标题作为分组。忽略围栏代码示例。最多 10,000 项任务。"
+  },
+  "everyday-text-wrap": {
+    "name": "文本换行",
+    "description": "按所选行宽折行，并保留已有换行。",
+    "help": "按 Unicode 字形簇计数，保留已有换行，并折叠每行内空白。长词保持完整。宽度是字符数，不是视觉宽度或终端单元格宽度。",
+    "fields": {
+      "width": "每行字符数"
+    }
+  },
+  "rust-playground": {
+    "name": "Rust 编译与运行",
+    "description": "将 Rust 编译为 WebAssembly，在本地运行，并保存编译后的模块。",
+    "help": "在可停止的 worker 中本地运行。实验性编译器与标准库首次使用时加载（传输压缩前 152 MiB）。单文件 Rust，目标为 wasm32-wasip1；不能下载 crate、不能 Cargo 构建、无网络、无操作系统线程。源码最多 1 MiB，每次运行 120 秒，每个输出流 128 KiB。",
+    "fields": {
+      "mode": "操作",
+      "edition": "Rust edition（版本）",
+      "stdin": "标准输入"
+    }
+  },
+  "rust-check": {
+    "name": "Rust 类型与借用检查",
+    "description": "运行 rustc 类型检查与借用检查，不执行程序。",
+    "help": "在可停止的 worker 中本地运行。实验性编译器与标准库首次使用时加载（传输压缩前 152 MiB）。单文件 Rust，目标为 wasm32-wasip1；不能下载 crate、不能 Cargo 构建、无网络、无操作系统线程。源码最多 1 MiB，每次运行 120 秒，每个输出流 128 KiB。",
+    "fields": {
+      "edition": "Rust edition（版本）"
+    }
+  },
+  "rust-source": {
+    "name": "Rust 源码查看器",
+    "description": "检查 Rust 语法，并浏览模块、函数、类型、导入与方法。",
+    "help": "使用 syn 解析源码。不做宏展开或类型检查；编译诊断请用 Rust 类型与借用检查器。上限：256 KiB。"
+  },
+  "rust-demangle": {
+    "name": "Rust 符号还原",
+    "description": "解码堆栈与二进制中的旧版及 v0 Rust 符号。",
+    "fields": {
+      "hash": "包含符号哈希"
+    }
+  },
+  "cargo-manifest": {
+    "name": "Cargo 清单查看器",
+    "description": "浏览 Cargo.toml 的依赖、feature、工作区默认值、目标与配置。",
+    "help": "检查本地文件或粘贴的文本。这些工具不会调用 Cargo、解析依赖或拉取 crate。"
+  },
+  "cargo-lock": {
+    "name": "Cargo 锁文件查看器",
+    "description": "检查锁定的包、校验和、依赖引用与重复包名。",
+    "help": "检查本地文件或粘贴的文本。这些工具不会调用 Cargo、解析依赖或拉取 crate。",
+    "fields": {
+      "duplicates": "仅显示名称重复的包"
+    }
+  },
+  "cargo-metadata": {
+    "name": "Cargo 依赖图查看器",
+    "description": "从 Cargo metadata 浏览工作区包、已启用 feature 与解析后的依赖图。",
+    "help": "粘贴或上传 cargo metadata --format-version 1 JSON。展开已解析图以查看包 ID、依赖种类与已启用 feature。用 --no-deps 生成的输出可能没有图。"
+  },
+  "cargo-diagnostics": {
+    "name": "Cargo 诊断查看器",
+    "description": "读取 rustc 与 Clippy 的 JSON 诊断，含代码、位置与建议修复。",
+    "help": "粘贴来自 cargo check --message-format=json、cargo clippy --message-format=json 或 rustc --error-format=json 的换行分隔 JSON。本查看器不会运行 Clippy。"
+  },
+  "cargo-version": {
+    "name": "Cargo 版本要求匹配",
+    "description": "对照 Cargo 的 semver 要求检查稳定版与预发布版本。",
+    "help": "检查本地文件或粘贴的文本。这些工具不会调用 Cargo、解析依赖或拉取 crate。",
+    "fields": {
+      "requirement": "Cargo 版本要求"
+    }
+  },
+  "wasm-compile": {
+    "name": "WAT 转 WebAssembly 编译器",
+    "description": "在本地将 WebAssembly 文本编译为通过校验的 .wasm 二进制。"
+  },
+  "wasm-disassemble": {
+    "name": "WebAssembly 转 WAT",
+    "description": "将 WebAssembly 二进制反汇编为可读文本，并保存 .wat 文件。"
+  },
+  "wasm-inspect": {
+    "name": "WebAssembly 模块查看器",
+    "description": "校验 WebAssembly 模块，并检查段、导出与自定义元数据。"
+  },
+  "media-inspect": {
+    "name": "媒体查看器",
+    "description": "检查编解码器、流、尺寸、时长、比特率与元数据。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。"
+  },
+  "video-convert": {
+    "name": "视频转换与压缩",
+    "description": "转换为 MP4、WebM 或 MKV，并选择输出质量。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "format": "输出格式",
+      "quality": "质量 / 体积"
+    }
+  },
+  "video-trim": {
+    "name": "视频裁剪",
+    "description": "精确截取片段并保存为 MP4 视频。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "start": "起始（秒）",
+      "duration": "时长（秒）"
+    }
+  },
+  "video-resize": {
+    "name": "视频缩放",
+    "description": "将视频放入所选尺寸内，并保持比例。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "width": "最大宽度",
+      "height": "最大高度"
+    }
+  },
+  "video-crop": {
+    "name": "视频裁切",
+    "description": "从视频中裁出矩形区域。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "width": "裁剪宽度",
+      "height": "裁剪高度",
+      "x": "左边缘（像素）",
+      "y": "上边缘（像素）"
+    }
+  },
+  "video-rotate": {
+    "name": "视频旋转与翻转",
+    "description": "旋转视频，或水平/垂直镜像。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "direction": "变换"
+    }
+  },
+  "video-speed": {
+    "name": "视频变速",
+    "description": "加快或减慢视频，并保持音调。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "speed": "播放速度（0.25–4×）"
+    }
+  },
+  "video-mute": {
+    "name": "移除视频音频",
+    "description": "移除所有音轨，且不重新编码视频。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "format": "输出格式"
+    }
+  },
+  "video-extract-audio": {
+    "name": "从视频提取音频",
+    "description": "将视频的第一条音轨另存为音频文件。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "format": "输出格式"
+    }
+  },
+  "video-gif": {
+    "name": "视频转 GIF",
+    "description": "将短片段转为优化后的动画 GIF。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "start": "起始（秒）",
+      "duration": "时长（秒）",
+      "width": "GIF 宽度（最大 800）",
+      "fps": "帧率（1–24）"
+    }
+  },
+  "video-frame": {
+    "name": "视频截帧",
+    "description": "将指定时间戳的一帧保存为 PNG。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "start": "时间戳（秒）"
+    }
+  },
+  "video-contact-sheet": {
+    "name": "视频联络表",
+    "description": "生成均匀间隔的视频缩略图网格。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "columns": "列数（1–6）",
+      "rows": "行数（1–6）"
+    }
+  },
+  "audio-convert": {
+    "name": "音频转换",
+    "description": "在 MP3、WAV、FLAC、M4A 与 Ogg Vorbis 之间转换音频。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "format": "输出格式"
+    }
+  },
+  "audio-trim": {
+    "name": "音频裁剪",
+    "description": "精确截取音频片段。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "start": "起始（秒）",
+      "duration": "时长（秒）",
+      "format": "输出格式"
+    }
+  },
+  "audio-join": {
+    "name": "拼接音频",
+    "description": "按显示顺序拼接最多八个音频文件，采样率与声道需一致。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "format": "输出格式"
+    }
+  },
+  "audio-volume": {
+    "name": "音频音量",
+    "description": "按分贝增益调整音量。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "gain": "增益（dB，−30 到 +20）",
+      "format": "输出格式"
+    }
+  },
+  "audio-normalize": {
+    "name": "音频响度归一化",
+    "description": "按真实峰值上限归一化感知响度。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "loudness": "目标响度（−24 到 −9 LUFS）",
+      "format": "输出格式"
+    }
+  },
+  "audio-speed": {
+    "name": "音频变速",
+    "description": "改变播放速度并保持音调。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "speed": "播放速度（0.25–4×）",
+      "format": "输出格式"
+    }
+  },
+  "audio-fade": {
+    "name": "音频淡入淡出",
+    "description": "为音频文件的开头和结尾应用平滑淡化。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "fadeIn": "淡入（秒）",
+      "fadeOut": "淡出（秒）",
+      "format": "输出格式"
+    }
+  },
+  "audio-reverse": {
+    "name": "音频倒放",
+    "description": "倒放音频片段（最长 60 秒）。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "format": "输出格式"
+    }
+  },
+  "audio-channels": {
+    "name": "音频声道与采样率",
+    "description": "在单声道与立体声之间转换，并选择采样率。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。",
+    "fields": {
+      "channels": "声道",
+      "sampleRate": "采样率（Hz）",
+      "format": "输出格式"
+    }
+  },
+  "audio-waveform": {
+    "name": "音频波形图",
+    "description": "将音频振幅绘制为 PNG 波形。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。"
+  },
+  "audio-spectrogram": {
+    "name": "音频频谱图",
+    "description": "将音频的频率随时间变化可视化为 PNG 图像。",
+    "help": "使用 FFmpeg 在本地处理文件。输入/输出最多 64 MiB，媒体最长 10 分钟，每项任务最多 2 分钟。视频输入上限 1920×1080 像素（竖屏同理）。FFmpeg 首次使用时加载。取消会停止处理并释放内存。"
+  },
+  "python-format": {
+    "name": "Python 格式化",
+    "description": "用 autopep8 格式化 Python，并保留注释。",
+    "help": "使用 Python 3.14 在本地运行。Python 首次使用时加载。只检查源码，不执行。输入最多 1 MiB、语法节点最多 10,000；停止会取消处理。",
+    "fields": {
+      "width": "最大行宽（40–200）"
+    }
+  },
+  "python-style": {
+    "name": "Python 风格检查",
+    "description": "查找 PEP 8 问题，含规则代码、行号与列号。",
+    "help": "使用 Python 3.14 在本地运行。Python 首次使用时加载。只检查源码，不执行。输入最多 1 MiB、语法节点最多 10,000；停止会取消处理。",
+    "fields": {
+      "width": "最大行宽（40–200）"
+    }
+  },
+  "python-syntax": {
+    "name": "Python 语法检查",
+    "description": "检查语法与编译期错误，不运行代码。",
+    "help": "使用 Python 3.14 在本地运行。Python 首次使用时加载。只检查源码，不执行。输入最多 1 MiB、语法节点最多 10,000；停止会取消处理。"
+  },
+  "python-ast": {
+    "name": "Python AST 查看器",
+    "description": "将 Python 语法树作为可展开的结构化数据浏览。",
+    "help": "使用 Python 3.14 在本地运行。Python 首次使用时加载。只检查源码，不执行。输入最多 1 MiB、语法节点最多 10,000；停止会取消处理。",
+    "fields": {
+      "locations": "包含源码位置（UTF-8 字节列偏移）"
+    }
+  },
+  "python-tokens": {
+    "name": "Python 分词器",
+    "description": "检查标记、精确标记类型与源码位置。",
+    "help": "使用 Python 3.14 在本地运行。Python 首次使用时加载。只检查源码，不执行。输入最多 1 MiB、语法节点最多 10,000；停止会取消处理。",
+    "fields": {
+      "comments": "包含注释与布局标记"
+    }
+  },
+  "python-imports": {
+    "name": "Python 导入查看器",
+    "description": "列出静态导入、别名与标准库分类。",
+    "help": "只检查 import 语句，不会真正导入模块。标准库分类描述的是 CPython，不代表本浏览器中有哪些包。不会推断动态导入及被导入模块的依赖。"
+  },
+  "python-outline": {
+    "name": "Python API 大纲",
+    "description": "浏览函数、类、签名、装饰器与文档字符串。",
+    "help": "使用 Python 3.14 在本地运行。Python 首次使用时加载。只检查源码，不执行。输入最多 1 MiB、语法节点最多 10,000；停止会取消处理。"
+  },
+  "python-metrics": {
+    "name": "Python 代码指标",
+    "description": "统计行数、注释、定义以及各函数的分支估算。",
+    "help": "静态指标，不执行源码。分支估算从 1 起，计入控制流判定、布尔分支、推导式与 match 分支，不含嵌套函数。这是启发式估计，不是代码质量分。"
+  },
+  "python-bytecode": {
+    "name": "Python 字节码查看器",
+    "description": "编译并检查模块与嵌套函数的 CPython 指令。",
+    "help": "编译源码但不运行。指令针对捆绑的 CPython 3.14 运行时。优化 1 会去掉断言；2 还会去掉文档字符串。预览最多 10,000 条指令。",
+    "fields": {
+      "optimize": "优化"
+    }
+  },
+  "python-literal-json": {
+    "name": "Python 字面量 → JSON",
+    "description": "将 Python 字面量字典、列表与值转为严格 JSON。",
+    "help": "解析字面量，不运行表达式。元组变为数组。字典键必须是字符串；集合、bytes、复数与非有限数字会被拒绝。"
+  },
+  "json-python-literal": {
+    "name": "JSON → Python 字面量",
+    "description": "将 JSON 转为可读的 Python 字面量，使用 True、False 与 None。",
+    "help": "在本地解析严格 JSON。保留对象顺序与任意大小的整数。生成 Python 字面量；不执行代码。",
+    "fields": {
+      "width": "最大行宽（40–200）"
+    }
+  },
+  "python-regex": {
+    "name": "Python 正则测试",
+    "description": "测试 Python re 模式、捕获组、替换与拆分。",
+    "help": "使用 Python 的 re 引擎。位置是 Unicode 码点偏移。最多 1,000 次匹配或拆分，替换输出最多 1 MiB。30 秒上限会终止昂贵模式；停止会立即取消。",
+    "fields": {
+      "pattern": "模式",
+      "action": "操作",
+      "replacement": "替换内容（支持 Python 反向引用）",
+      "flags": "标志（i m s x a）"
+    }
+  },
+  "python-runner": {
+    "name": "Python 运行器",
+    "description": "在本地用控制台、标准输入与 WebAssembly 运行 Python。",
+    "help": "运行脚本或启动带持久变量的 Python REPL。交互终端支持行输入、ANSI 输出、↑/↓ 历史、Ctrl+D 表示 EOF，以及 Ctrl+C（中断提示；忙碌代码会停止并重置）。等待输入不占用时限。交互输入需要 WebAssembly JSPI。包含捆绑的标准库，不会自动安装包。Python 与终端首次使用时加载。",
+    "fields": {
+      "mode": "模式",
+      "inputMode": "输入模式",
+      "stdin": "标准输入（每次 input() 一行）",
+      "seconds": "执行时限（秒）"
+    }
+  },
+  "browser-fingerprint": {
+    "name": "浏览器指纹",
+    "description": "比较 L5Z12、FingerprintJS、CreepJS 与 Client Hints 格式，含本地指纹与可下载报告。",
+    "help": "选择一种格式，然后点击运行以在本地检查此浏览器。报告不会自动上传或保存。不会请求权限提示。浏览器设置、更新与隐私保护可能改变或掩盖信号；指纹不能证明身份。每种格式使用各自的探测与哈希输入。FingerprintJS 会短暂设置并删除测试 cookie，以检查是否支持 cookie。",
+    "fields": {
+      "profile": "指纹格式",
+      "highEntropy": "包含高熵 Client Hints（若可用）",
+      "canvas": "包含 canvas 渲染",
+      "webgl": "包含 WebGL 能力与渲染器"
+    }
+  },
+  "hash-workbench": {
+    "name": "哈希与校验和工作台",
+    "description": "从 50 种哈希/校验和变体中选择，并比较自定义选择、Popular 预设或全部变体。",
+    "help": "文件使用精确字节；文本默认 UTF-8 且不追加换行。多种哈希：最多 1 MiB。单一哈希：最多 32 MiB（MD2：4 MiB）。校验和与旧哈希会与现代哈希分开标注。xxHash32 与 Murmur3 使用 32 位种子；xxHash64/XXH3 使用 64 位种子。数值校验和按大端字节显示。输出格式控件只对所选一种算法生效。固定 BLAKE2 变体使用其规定摘要长度，不是截断。不暗示口令哈希或带密钥模式。",
+    "fields": {
+      "inputFormat": "文本输入格式（文件输入时忽略）",
+      "length": "SHAKE / BLAKE3 XOF 输出字节数（1–4096）",
+      "seed": "xxHash / MurmurHash 种子（无符号十进制）",
+      "expected": "期望摘要（可选，十六进制）"
+    }
+  },
+  "util-file-fingerprint": {
+    "name": "文件指纹",
+    "description": "检查魔数、SHA-256、熵与字节分布，不依赖文件名。",
+    "help": "签名检测只是提示，不是完整格式校验。熵衡量字节分布，不能证明数据是否加密。文件最多 32 MiB。"
+  },
+  "util-binary-strings": {
+    "name": "文件中的字符串",
+    "description": "查找二进制文件中的可打印字符串，并给出精确字节偏移。",
+    "help": "UTF-16 模式提取可打印 ASCII 子集。会扫描两种字节对齐。最多 2,000 个字符串；每个预览 4,096 个字符。文件最多 32 MiB。",
+    "fields": {
+      "encoding": "字符串编码",
+      "minimum": "最少字符数"
+    }
+  },
+  "util-binary-diff": {
+    "name": "二进制文件比较",
+    "description": "定位两个文件中已更改的字节区间，并查看更改前后的字节。",
+    "help": "恰好选择两个文件，每个最多 8 MiB。按相同偏移比较；插入的字节不会重新对齐。最多报告 2,000 个区间，并给出完整差异计数。"
+  },
+  "util-byte-order": {
+    "name": "字节序解释器",
+    "description": "将十六进制字节按两种字节序解读为有符号整数、无符号整数与浮点值。",
+    "help": "在字节足够时，从同一起始偏移读取 8、16、32 与 64 位值。接受共用的十六进制写法。所有整数值都是精确字符串。",
+    "fields": {
+      "offset": "起始字节偏移"
+    }
+  },
+  "util-line-sets": {
+    "name": "列表 / 集合比较",
+    "description": "找出两个列表中共有、缺失或独有的条目。",
+    "help": "每行一项。空项忽略；重复项合并。可选去空白后，保留首次出现顺序与拼写。每个列表最多 50,000 行。",
+    "fields": {
+      "other": "第二个列表",
+      "operation": "操作",
+      "trim": "匹配前去除空白",
+      "ignoreCase": "忽略 ASCII 字母大小写"
+    }
+  },
+  "util-json-size": {
+    "name": "JSON 体积分析",
+    "description": "找出 JSON 载荷中占用字节最多的属性与数组项。",
+    "help": "衡量压缩后 UTF-8 JSON 值的大小，不含各属性名。父子大小会重叠。最多列出 5,000 条路径，按大小排序；最大深度 64。路径使用 JSON Pointer 转义。"
+  },
+  "util-json-redact": {
+    "name": "JSON 字段打码",
+    "description": "在分享前替换 JSON 文档中选定的字段。",
+    "help": "匹配完整字段名（忽略 ASCII 大小写），作用于每一层。只会打码你指定的名称；分享前请检查结果。最大深度 64。",
+    "fields": {
+      "keys": "字段名，逗号分隔",
+      "replacement": "替换文本"
+    }
+  },
+  "util-csv-profile": {
+    "name": "CSV 数据画像",
+    "description": "检查每列的缺失值、不同值与数值范围。",
+    "help": "第一行是表头。重复列名按索引区分。缺失表示空或仅空白；去重使用原始精确字符串。数值范围包含可解析的有限值。最多 8 MiB、50,000 行、100 列。",
+    "fields": {
+      "delimiter": "分隔符"
+    }
+  },
+  "util-log-patterns": {
+    "name": "日志模式分析",
+    "description": "在规范化时间戳、UUID 与数字后，对重复日志消息分组。",
+    "help": "启发式分组会替换 ISO 风格时间戳、UUID 与独立十进制数字。示例保留原文。分组不是诊断结论。最多 50,000 行、5,000 种不同模式。"
+  },
+  "util-clean-urls": {
+    "name": "跟踪 URL 清理",
+    "description": "批量移除常见跟踪参数，并查看具体改动。",
+    "help": "移除 utm_* 以及 fbclid、gclid、dclid、msclkid、mc_cid 与 mc_eid，忽略 ASCII 大小写。其余重复参数按原顺序保留。仅 HTTP(S)，最多 1,000 个 URL。URL 序列化可能规范化转义；修改可能使带签名的 URL 失效。",
+    "fields": {
+      "fragment": "同时移除片段标识"
+    }
+  },
+  "util-subtitle-shift": {
+    "name": "字幕时间偏移",
+    "description": "将 SRT 或 WebVTT cue 前移或后移，并导出调整后的文件。",
+    "help": "保留字幕文本、ID 与 WebVTT cue 设置。若任何 cue 被移到零之前则拒绝。支持普通 SRT 与 WebVTT cue；拒绝 WebVTT NOTE/STYLE/REGION 块与行内时间戳标签。最多 10,000 条 cue。",
+    "fields": {
+      "shift": "偏移毫秒数（负数为提前）"
+    }
+  },
+  "util-ip-range": {
+    "name": "IP 范围 → CIDR 块",
+    "description": "用最少的对齐 CIDR 块覆盖闭区间 IPv4 范围。",
+    "help": "仅 IPv4。包含两端点，包括网络地址与广播地址。返回精确地址数与可下载的 CIDR 列表。",
+    "fields": {
+      "end": "最后一个 IPv4 地址（含）"
+    }
+  },
+  "microsoft-errors": {
+    "name": "Microsoft 错误代码",
+    "description": "浏览 MS-ERREF 表中的全部 HRESULT、Win32 与 NTSTATUS 条目。",
+    "help": "可搜索十六进制（0x80070005 或 80070005）、有符号/无符号十进制、符号名或消息词语。别名会保留。覆盖 MS-ERREF；该规范之外的产品特定错误不包含。",
+    "fields": {
+      "family": "代码族"
+    }
+  },
+  "hresult-decode": {
+    "name": "HRESULT 解码器",
+    "description": "解码严重性、customer 与 NT 标志、设施与代码；解析名称与包装错误。",
+    "help": "接受 32 位值或精确的 HRESULT 符号名。自动模式将八位数字视为十六进制；可选择十进制覆盖。若 NT 位置位，则按嵌入的 NTSTATUS 解码。",
+    "fields": {
+      "base": "数字格式"
+    }
+  },
+  "ntstatus-decode": {
+    "name": "NTSTATUS 解码器",
+    "description": "解码全部 NTSTATUS 字段、严重性与 NT_SUCCESS，并匹配 Microsoft 消息。",
+    "help": "成功与信息状态满足 NT_SUCCESS；警告与错误状态不满足。自动模式将八位数字视为十六进制；可选择十进制覆盖。未知值仍会显示其字段。",
+    "fields": {
+      "base": "数字格式"
+    }
+  },
+  "win32-hresult": {
+    "name": "Win32 ↔ HRESULT",
+    "description": "应用 HRESULT_FROM_WIN32，或从包装的 HRESULT 提取 Win32 代码。",
+    "help": "正向宏会保留非正的有符号 32 位输入，否则包装低 16 位。反向转换接受 0 或 0x8007XXXX 形式；丢失的高位无法恢复。自动模式将八位数字视为十六进制。",
+    "fields": {
+      "direction": "方向",
+      "base": "数字格式"
+    }
+  },
+  "ldap-errors": {
+    "name": "LDAP → Win32 映射",
+    "description": "查找 MS-ERREF LDAP 结果码、Windows LDAP 名称及其 Win32 映射。",
+    "help": "空白映射在此来源中保留为未记录。可用十进制/十六进制代码或任一符号名搜索。"
+  },
+  "http-status-reference": {
+    "name": "HTTP 状态码参考",
+    "description": "搜索 IANA 状态码注册表，包括临时、已废弃与未分配范围。",
+    "fields": {
+      "family": "状态类别"
+    }
+  },
+  "dns-reference": {
+    "name": "DNS 记录与响应码",
+    "description": "浏览 IANA DNS 记录类型、响应码、操作码与类别。",
+    "fields": {
+      "family": "注册表"
+    }
+  },
+  "mime-reference": {
+    "name": "媒体类型参考",
+    "description": "按类型、子类型或引用来源搜索完整 IANA 媒体类型注册表。",
+    "help": "已注册的媒体类型，不是按文件扩展名猜测的数据库。未注册类型不在此快照中。",
+    "fields": {
+      "family": "顶级类型"
+    }
+  },
+  "port-reference": {
+    "name": "端口与服务参考",
+    "description": "搜索 IANA 已注册服务名、端口号、范围与传输协议。",
+    "help": "这些是注册表分配，不是对本机的扫描。实际服务可能使用其他端口。未分配与保留行会保留。",
+    "fields": {
+      "family": "传输协议"
+    }
+  },
+  "cipher-gronsfeld": {
+    "name": "Gronsfeld 密码",
+    "description": "由重复十进制密钥驱动的 Vigenère 风格位移。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。ASCII 字母推进密钥；保留大小写、标点与 Unicode。",
+    "fields": {
+      "mode": "操作",
+      "key": "十进制密钥"
+    }
+  },
+  "cipher-running-key": {
+    "name": "流水密钥密码",
+    "description": "使用与明文等长、不重复密钥的 Vigenère 加密。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。每个 ASCII 输入字母对应一个密钥字母。密钥从不重复；保留大小写与标点。",
+    "fields": {
+      "mode": "操作",
+      "key": "字母流水密钥"
+    }
+  },
+  "cipher-trithemius": {
+    "name": "Trithemius 密码",
+    "description": "按所选起点与步长逐步位移字母。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。位移 = 起始 + 步长 × 字母序号。只有 ASCII 字母推进序号；保留大小写与标点。",
+    "fields": {
+      "mode": "操作",
+      "start": "初始位移",
+      "step": "每字母步长"
+    }
+  },
+  "cipher-hill": {
+    "name": "Hill 密码（2×2）",
+    "description": "用模 26 可逆 2×2 矩阵加密字母对。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。A=0 至 Z=25；列向量乘法。非字母省略。末尾奇数字母用 X 填充；解密保留填充。行列式必须与 26 互质。",
+    "fields": {
+      "mode": "操作",
+      "matrix": "矩阵（按行）：a b c d"
+    }
+  },
+  "cipher-four-square": {
+    "name": "四方密码",
+    "description": "用两个带密钥的 5×5 方阵加密双字母组。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。左上与右下为无密钥方阵。规范化为 A–Z，合并 I/J，省略非字母，奇数输入用 X 填充；填充会保留。",
+    "fields": {
+      "mode": "操作",
+      "key": "右上方阵关键词",
+      "key2": "左下方阵关键词"
+    }
+  },
+  "cipher-adfgx": {
+    "name": "ADFGX 密码",
+    "description": "先做 Polybius 分数化，再做密钥列置换。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。规范化为字母并合并 I/J。使用 ADFGX 坐标。无置换填充；重复关键词字母从左到右排序。",
+    "fields": {
+      "mode": "操作",
+      "key": "5×5 方阵关键词",
+      "transposition": "列置换关键词"
+    }
+  },
+  "cipher-adfgvx": {
+    "name": "ADFGVX 密码",
+    "description": "用 6×6 方阵分数化字母与数字，再做列置换。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。方阵顺序为关键词后接 A–Z 与 0–9，并去除重复。只保留字母/数字并转为大写。使用 ADFGVX 坐标；无填充。",
+    "fields": {
+      "mode": "操作",
+      "key": "6×6 方阵关键词",
+      "transposition": "列置换关键词"
+    }
+  },
+  "cipher-trifid": {
+    "name": "Trifid 密码",
+    "description": "在带密钥的 3×3×3 立方体中混合三维坐标。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。转为大写并省略 ASCII 空白。其他符号必须存在于 27 符号字母表。立方体按层、行、列填充；关键词重复会去除。周期：1–1000。",
+    "fields": {
+      "mode": "操作",
+      "key": "立方体关键词",
+      "alphabet": "27 符号字母表",
+      "period": "周期"
+    }
+  },
+  "cipher-nihilist": {
+    "name": "Nihilist 密码",
+    "description": "将带密钥的 Polybius 坐标加到重复数字密钥流上。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。规范化为字母并合并 I/J。输出用空格分隔的十进制和 22–110；和不对 100 取模。",
+    "fields": {
+      "mode": "操作",
+      "key": "方阵关键词",
+      "additiveKey": "加性关键词"
+    }
+  },
+  "cipher-rc4": {
+    "name": "RC4 / RC4-drop",
+    "description": "旧版 RC4 字节加密，可选丢弃密钥流。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。RC4 已被攻破，仅供兼容与学习。支持 3、4、5、6、8、16、24 或 32 字节密钥。丢弃：0–1,000,000（RC4-drop[3072] 请选 3072）。加密输出十六进制；解密请选择 Hex。",
+    "fields": {
+      "mode": "操作",
+      "key": "密钥（十六进制）",
+      "drop": "丢弃前 N 个密钥流字节",
+      "inputFormat": "输入格式"
+    }
+  },
+  "codec-base32": {
+    "name": "Base32 / Base32hex",
+    "description": "编码与解码 RFC 4648 Base32 字母表。",
+    "help": "编码最多 2 MiB 字节；解码已编码文件最多 32 MiB，结果上限 2 MiB。Base58/Base62 支持 16 KiB 字节或 32 KiB 编码文本。选择文件时使用其精确字节；否则按 UTF-8 处理。解码得到的二进制结果可下载。",
+    "fields": {
+      "mode": "操作",
+      "variant": "字母表",
+      "padding": "填充"
+    }
+  },
+  "codec-crockford": {
+    "name": "Crockford Base32",
+    "description": "用 Crockford 易读 Base32 字母表编码字节。",
+    "help": "面向字节的编码，不含校验符号。解码时 O 视为 0，I/L 视为 1，并忽略连字符。编码最多 2 MiB 字节；解码已编码文件最多 32 MiB，结果上限 2 MiB。Base58/Base62 支持 16 KiB 字节或 32 KiB 编码文本。选择文件时使用其精确字节；否则按 UTF-8 处理。解码得到的二进制结果可下载。",
+    "fields": {
+      "mode": "操作"
+    }
+  },
+  "codec-base58": {
+    "name": "Base58",
+    "description": "编码与解码 Bitcoin、Flickr 与 Ripple Base58。",
+    "help": "编码最多 2 MiB 字节；解码已编码文件最多 32 MiB，结果上限 2 MiB。Base58/Base62 支持 16 KiB 字节或 32 KiB 编码文本。选择文件时使用其精确字节；否则按 UTF-8 处理。解码得到的二进制结果可下载。",
+    "fields": {
+      "mode": "操作",
+      "variant": "字母表"
+    }
+  },
+  "codec-base62": {
+    "name": "Base62",
+    "description": "用既定字母表将字节编码为 Base62，并保留前导零字节。",
+    "help": "字母表：0–9、A–Z、a–z。每个前导 0 表示一个前导零字节。没有通用的 Base62 字节格式。编码最多 2 MiB 字节；解码已编码文件最多 32 MiB，结果上限 2 MiB。Base58/Base62 支持 16 KiB 字节或 32 KiB 编码文本。选择文件时使用其精确字节；否则按 UTF-8 处理。解码得到的二进制结果可下载。",
+    "fields": {
+      "mode": "操作"
+    }
+  },
+  "codec-ascii85": {
+    "name": "Ascii85",
+    "description": "编码与解码 Adobe Ascii85，包括零块简写。",
+    "help": "输出 <~ ~> 分隔符，并接受带或不带包装的输入。支持 z，不支持 btoa 的 y 扩展。编码最多 2 MiB 字节；解码已编码文件最多 32 MiB，结果上限 2 MiB。Base58/Base62 支持 16 KiB 字节或 32 KiB 编码文本。选择文件时使用其精确字节；否则按 UTF-8 处理。解码得到的二进制结果可下载。",
+    "fields": {
+      "mode": "操作"
+    }
+  },
+  "codec-z85": {
+    "name": "Z85",
+    "description": "编码与解码 ZeroMQ 的 Base85 字母表。",
+    "help": "编码时输入字节数必须是 4 的倍数；编码文本必须是 5 的倍数。编码最多 2 MiB 字节；解码已编码文件最多 32 MiB，结果上限 2 MiB。Base58/Base62 支持 16 KiB 字节或 32 KiB 编码文本。选择文件时使用其精确字节；否则按 UTF-8 处理。解码得到的二进制结果可下载。",
+    "fields": {
+      "mode": "操作"
+    }
+  },
+  "codec-base91": {
+    "name": "basE91",
+    "description": "使用标准 basE91 字母表的紧凑二进制到文本编码。",
+    "help": "编码最多 2 MiB 字节；解码已编码文件最多 32 MiB，结果上限 2 MiB。Base58/Base62 支持 16 KiB 字节或 32 KiB 编码文本。选择文件时使用其精确字节；否则按 UTF-8 处理。解码得到的二进制结果可下载。",
+    "fields": {
+      "mode": "操作"
+    }
+  },
+  "codec-quoted-printable": {
+    "name": "Quoted-printable",
+    "description": "编码与解码 MIME quoted-printable 字节数据。",
+    "help": "编码最多 2 MiB 字节；解码已编码文件最多 32 MiB，结果上限 2 MiB。Base58/Base62 支持 16 KiB 字节或 32 KiB 编码文本。选择文件时使用其精确字节；否则按 UTF-8 处理。解码得到的二进制结果可下载。",
+    "fields": {
+      "mode": "操作"
+    }
+  },
+  "codec-uuencode": {
+    "name": "Uuencode",
+    "description": "将文件编码为传统 begin/end uuencode 块。",
+    "help": "输出权限 644 与文件名 data.bin；原始字节会保留。编码最多 2 MiB 字节；解码已编码文件最多 32 MiB，结果上限 2 MiB。Base58/Base62 支持 16 KiB 字节或 32 KiB 编码文本。选择文件时使用其精确字节；否则按 UTF-8 处理。解码得到的二进制结果可下载。",
+    "fields": {
+      "mode": "操作"
+    }
+  },
+  "codec-byte-radix": {
+    "name": "字节进制编码器",
+    "description": "用二进制、八进制、十进制或十六进制表示精确字节。",
+    "help": "每个字节一个固定宽度的值，以空格分隔。编码最多 2 MiB 字节；解码已编码文件最多 32 MiB，结果上限 2 MiB。Base58/Base62 支持 16 KiB 字节或 32 KiB 编码文本。选择文件时使用其精确字节；否则按 UTF-8 处理。解码得到的二进制结果可下载。",
+    "fields": {
+      "mode": "操作",
+      "radix": "进制"
+    }
+  },
+  "codec-percent-bytes": {
+    "name": "百分号字节编码",
+    "description": "对每个字节做百分号编码，或解码百分号转义。",
+    "help": "字面 + 仍为 +。URL 组件约定请使用现有 URL 工具。编码最多 2 MiB 字节；解码已编码文件最多 32 MiB，结果上限 2 MiB。Base58/Base62 支持 16 KiB 字节或 32 KiB 编码文本。选择文件时使用其精确字节；否则按 UTF-8 处理。解码得到的二进制结果可下载。",
+    "fields": {
+      "mode": "操作"
+    }
+  },
+  "codec-base64-bytes": {
+    "name": "Base64 文件编码器",
+    "description": "用标准或 URL-safe Base64 编码或解码文件。",
+    "help": "编码最多 2 MiB 字节；解码已编码文件最多 32 MiB，结果上限 2 MiB。Base58/Base62 支持 16 KiB 字节或 32 KiB 编码文本。选择文件时使用其精确字节；否则按 UTF-8 处理。解码得到的二进制结果可下载。",
+    "fields": {
+      "mode": "操作",
+      "variant": "字母表",
+      "padding": "填充"
+    }
+  },
+  "codec-data-uri": {
+    "name": "Data URI 编码器",
+    "description": "从文件创建 data URI，或解码 Base64 与百分号编码的 data URI。",
+    "help": "编码最多 2 MiB 字节；解码已编码文件最多 32 MiB，结果上限 2 MiB。Base58/Base62 支持 16 KiB 字节或 32 KiB 编码文本。选择文件时使用其精确字节；否则按 UTF-8 处理。解码得到的二进制结果可下载。",
+    "fields": {
+      "mode": "操作",
+      "mime": "媒体类型"
+    }
+  },
+  "cipher-caesar": {
+    "name": "Caesar 密码",
+    "description": "将 ASCII 字母按所选数量前移或后移。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。保留大小写、标点与非 ASCII 字符。",
+    "fields": {
+      "mode": "操作",
+      "shift": "位移"
+    }
+  },
+  "cipher-rot47": {
+    "name": "ROT47",
+    "description": "将可打印 ASCII 字符旋转 47 位。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。编码与解码是同一操作。",
+    "fields": {
+      "mode": "操作"
+    }
+  },
+  "cipher-atbash": {
+    "name": "Atbash 密码",
+    "description": "反转拉丁字母：A ↔ Z、B ↔ Y。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。保留大小写与标点。",
+    "fields": {
+      "mode": "操作"
+    }
+  },
+  "cipher-vigenere": {
+    "name": "Vigenère 密码",
+    "description": "用重复字母密钥加密与解密。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。仅对 ASCII 字母推进密钥；保留大小写与标点。",
+    "fields": {
+      "mode": "操作",
+      "key": "字母密钥"
+    }
+  },
+  "cipher-beaufort": {
+    "name": "Beaufort 密码",
+    "description": "应用互逆的密钥减明文 Beaufort 密码。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。仅对 ASCII 字母推进密钥。",
+    "fields": {
+      "mode": "操作",
+      "key": "字母密钥"
+    }
+  },
+  "cipher-autokey": {
+    "name": "Autokey 密码",
+    "description": "用引物后接还原明文作为 Vigenère 密钥流。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。明文自动密钥变体；只有 ASCII 字母推进密钥流。",
+    "fields": {
+      "mode": "操作",
+      "key": "字母密钥"
+    }
+  },
+  "cipher-affine": {
+    "name": "Affine 密码",
+    "description": "用可逆乘数做 ax + b 模 26。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。",
+    "fields": {
+      "mode": "操作",
+      "a": "乘数 a（须与 26 互质）",
+      "b": "偏移 b"
+    }
+  },
+  "cipher-substitution": {
+    "name": "替换密码",
+    "description": "用完整带密钥字母表替换字母。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。字母表必须恰好包含一次 A–Z。",
+    "fields": {
+      "mode": "操作",
+      "alphabet": "密文字母表"
+    }
+  },
+  "cipher-rail-fence": {
+    "name": "栅栏密码",
+    "description": "按之字形跨栏重排文本。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。保留每个字符，包括空格与 Unicode。栅栏数：2–100。",
+    "fields": {
+      "mode": "操作",
+      "rails": "栅栏数"
+    }
+  },
+  "cipher-columnar": {
+    "name": "列置换",
+    "description": "按关键词重排列，重复字母采用稳定排序。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。无填充；空格与 Unicode 会保留。重复密钥字母从左到右排序。",
+    "fields": {
+      "mode": "操作",
+      "key": "关键词"
+    }
+  },
+  "cipher-scytale": {
+    "name": "Scytale 置换",
+    "description": "将文本绕网格书写，再按列读出。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。无填充；每个字符都会保留。",
+    "fields": {
+      "mode": "操作",
+      "columns": "列数"
+    }
+  },
+  "cipher-playfair": {
+    "name": "Playfair 密码",
+    "description": "在带密钥的 5×5 方阵中加密与解密字母对。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。规范化后仅 A–Z；I/J 合并。X 分隔重复字母，Q 分隔重复 X。解密保留填充，因为删除会有歧义。",
+    "fields": {
+      "mode": "操作",
+      "key": "方阵关键词"
+    }
+  },
+  "cipher-polybius": {
+    "name": "Polybius 方阵",
+    "description": "在带密钥的 5×5 方阵中将字母转为行列坐标。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。规范化为 A–Z，将 J 并入 I，并输出 11–55 数对。加密时省略非字母。",
+    "fields": {
+      "mode": "操作",
+      "key": "方阵关键词"
+    }
+  },
+  "cipher-bifid": {
+    "name": "Bifid 密码",
+    "description": "在所选周期内混合 Polybius 坐标。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。规范化为 A–Z 并将 J 并入 I。周期：1–1000。",
+    "fields": {
+      "mode": "操作",
+      "key": "方阵关键词",
+      "period": "周期"
+    }
+  },
+  "cipher-bacon": {
+    "name": "Bacon 密码",
+    "description": "用五个 A/B 符号表示字母。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。省略非字母。解密输出大写；合并字母解码为 I 与 U。",
+    "fields": {
+      "mode": "操作",
+      "variant": "字母表"
+    }
+  },
+  "cipher-morse": {
+    "name": "Morse 电码",
+    "description": "翻译国际 Morse 字母、数字与常见标点。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。空格分隔符号；/ 分隔单词。不支持的字符会被拒绝。解密输出大写。",
+    "fields": {
+      "mode": "操作"
+    }
+  },
+  "cipher-nato": {
+    "name": "NATO 音标字母",
+    "description": "将字母与数字译为拼读字母表单词。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。空格分隔单词；/ 表示原文空格。不支持的标点会被拒绝。解密输出大写。",
+    "fields": {
+      "mode": "操作"
+    }
+  },
+  "cipher-a1z26": {
+    "name": "A1Z26",
+    "description": "将 A–Z 表示为数字 1–26。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。空格分隔数值；/ 分隔单词。不支持的字符会被拒绝。",
+    "fields": {
+      "mode": "操作"
+    }
+  },
+  "cipher-xor": {
+    "name": "重复 XOR",
+    "description": "用重复密钥对字节数据做 XOR。",
+    "help": "历史密码，供解谜与学习使用，并非安全加密。可逆的字节运算，并非安全加密。结果包含十六进制、Base64 与二进制下载。",
+    "fields": {
+      "mode": "操作",
+      "key": "密钥（十六进制）",
+      "inputFormat": "输入格式"
+    }
+  },
+  "crypto-aes-gcm": {
+    "name": "AES-GCM",
+    "description": "带 128 位标签的认证 AES-128/192/256 加密。",
+    "help": "认证加密。加密输出含 12 字节 nonce/IV 与密文的 JSON 信封，从不包含密钥。解密会自动识别该信封。原始密文使用所选 Hex/Base64 格式及你提供的 IV。切勿对同一密钥重复使用 nonce/计数器。AAD 仅适用于认证模式。载荷上限 8 MiB。结果较大时，请保存 encrypted.json 并作为文件选择后再解密。",
+    "fields": {
+      "mode": "操作",
+      "key": "密钥（十六进制；可在下方生成 256 位密钥）",
+      "iv": "Nonce（十六进制；留空则加密时生成）",
+      "aad": "附加认证数据（UTF-8）",
+      "inputFormat": "输入格式"
+    }
+  },
+  "crypto-chacha20-poly1305": {
+    "name": "ChaCha20-Poly1305",
+    "description": "使用 256 位密钥与 96 位 nonce 的认证加密。",
+    "help": "认证加密。加密输出含 12 字节 nonce/IV 与密文的 JSON 信封，从不包含密钥。解密会自动识别该信封。原始密文使用所选 Hex/Base64 格式及你提供的 IV。切勿对同一密钥重复使用 nonce/计数器。AAD 仅适用于认证模式。载荷上限 8 MiB。结果较大时，请保存 encrypted.json 并作为文件选择后再解密。",
+    "fields": {
+      "mode": "操作",
+      "key": "密钥（十六进制；可在下方生成 256 位密钥）",
+      "iv": "Nonce（十六进制；留空则加密时生成）",
+      "aad": "附加认证数据（UTF-8）",
+      "inputFormat": "输入格式"
+    }
+  },
+  "crypto-xchacha20-poly1305": {
+    "name": "XChaCha20-Poly1305",
+    "description": "使用 256 位密钥与扩展 192 位 nonce 的认证加密。",
+    "help": "认证加密。加密输出含 24 字节 nonce/IV 与密文的 JSON 信封，从不包含密钥。解密会自动识别该信封。原始密文使用所选 Hex/Base64 格式及你提供的 IV。切勿对同一密钥重复使用 nonce/计数器。AAD 仅适用于认证模式。载荷上限 8 MiB。结果较大时，请保存 encrypted.json 并作为文件选择后再解密。",
+    "fields": {
+      "mode": "操作",
+      "key": "密钥（十六进制；可在下方生成 256 位密钥）",
+      "iv": "Nonce（十六进制；留空则加密时生成）",
+      "aad": "附加认证数据（UTF-8）",
+      "inputFormat": "输入格式"
+    }
+  },
+  "crypto-aes-cbc": {
+    "name": "AES-CBC",
+    "description": "CBC 模式的 AES-128/192/256，PKCS#7 填充。",
+    "help": "非认证兼容密码；密文被改动时无法可靠检测。加密输出含 16 字节 nonce/IV 与密文的 JSON 信封，从不包含密钥。解密会自动识别该信封。原始密文使用所选 Hex/Base64 格式及你提供的 IV。切勿对同一密钥重复使用 nonce/计数器。AAD 仅适用于认证模式。载荷上限 8 MiB。结果较大时，请保存 encrypted.json 并作为文件选择后再解密。",
+    "fields": {
+      "mode": "操作",
+      "key": "密钥（十六进制；可在下方生成 256 位密钥）",
+      "iv": "IV / 计数器（十六进制；留空则加密时生成）",
+      "aad": "附加认证数据（UTF-8）",
+      "inputFormat": "输入格式"
+    }
+  },
+  "crypto-aes-ctr": {
+    "name": "AES-CTR",
+    "description": "使用 128 位大端计数器的 AES-128/192/256。",
+    "help": "非认证兼容密码；密文被改动时无法可靠检测。加密输出含 16 字节 nonce/IV 与密文的 JSON 信封，从不包含密钥。解密会自动识别该信封。原始密文使用所选 Hex/Base64 格式及你提供的 IV。切勿对同一密钥重复使用 nonce/计数器。AAD 仅适用于认证模式。载荷上限 8 MiB。结果较大时，请保存 encrypted.json 并作为文件选择后再解密。",
+    "fields": {
+      "mode": "操作",
+      "key": "密钥（十六进制；可在下方生成 256 位密钥）",
+      "iv": "IV / 计数器（十六进制；留空则加密时生成）",
+      "aad": "附加认证数据（UTF-8）",
+      "inputFormat": "输入格式"
+    }
+  },
+  "crypto-des-cbc": {
+    "name": "DES-CBC",
+    "description": "CBC 模式的旧版 DES，PKCS#7 填充。",
+    "help": "非认证兼容密码；密文被改动时无法可靠检测。DES 与 Triple DES 已过时；新数据请使用认证密码。加密输出含 8 字节 nonce/IV 与密文的 JSON 信封，从不包含密钥。解密会自动识别该信封。原始密文使用所选 Hex/Base64 格式及你提供的 IV。切勿对同一密钥重复使用 nonce/计数器。AAD 仅适用于认证模式。载荷上限 8 MiB。结果较大时，请保存 encrypted.json 并作为文件选择后再解密。",
+    "fields": {
+      "mode": "操作",
+      "key": "密钥（十六进制；可在下方生成 64 位密钥）",
+      "iv": "IV / 计数器（十六进制；留空则加密时生成）",
+      "aad": "附加认证数据（UTF-8）",
+      "inputFormat": "输入格式"
+    }
+  },
+  "crypto-3des-cbc": {
+    "name": "Triple DES-CBC",
+    "description": "三密钥 EDE Triple DES，CBC 模式，PKCS#7 填充。",
+    "help": "非认证兼容密码；密文被改动时无法可靠检测。DES 与 Triple DES 已过时；新数据请使用认证密码。加密输出含 8 字节 nonce/IV 与密文的 JSON 信封，从不包含密钥。解密会自动识别该信封。原始密文使用所选 Hex/Base64 格式及你提供的 IV。切勿对同一密钥重复使用 nonce/计数器。AAD 仅适用于认证模式。载荷上限 8 MiB。结果较大时，请保存 encrypted.json 并作为文件选择后再解密。",
+    "fields": {
+      "mode": "操作",
+      "key": "密钥（十六进制；可在下方生成 192 位密钥）",
+      "iv": "IV / 计数器（十六进制；留空则加密时生成）",
+      "aad": "附加认证数据（UTF-8）",
+      "inputFormat": "输入格式"
+    }
+  },
+  "crypto-blowfish-cbc": {
+    "name": "Blowfish-CBC",
+    "description": "CBC 模式 Blowfish，PKCS#7 填充；密钥 4–56 字节。",
+    "help": "非认证兼容密码；密文被改动时无法可靠检测。加密输出含 8 字节 nonce/IV 与密文的 JSON 信封，从不包含密钥。解密会自动识别该信封。原始密文使用所选 Hex/Base64 格式及你提供的 IV。切勿对同一密钥重复使用 nonce/计数器。AAD 仅适用于认证模式。载荷上限 8 MiB。结果较大时，请保存 encrypted.json 并作为文件选择后再解密。",
+    "fields": {
+      "mode": "操作",
+      "key": "密钥（十六进制；可在下方生成 256 位密钥）",
+      "iv": "IV / 计数器（十六进制；留空则加密时生成）",
+      "aad": "附加认证数据（UTF-8）",
+      "inputFormat": "输入格式"
+    }
+  },
+  "crypto-twofish-cbc": {
+    "name": "Twofish-CBC",
+    "description": "CBC 模式 Twofish，PKCS#7 填充；密钥 16/24/32 字节。",
+    "help": "非认证兼容密码；密文被改动时无法可靠检测。加密输出含 16 字节 nonce/IV 与密文的 JSON 信封，从不包含密钥。解密会自动识别该信封。原始密文使用所选 Hex/Base64 格式及你提供的 IV。切勿对同一密钥重复使用 nonce/计数器。AAD 仅适用于认证模式。载荷上限 8 MiB。结果较大时，请保存 encrypted.json 并作为文件选择后再解密。",
+    "fields": {
+      "mode": "操作",
+      "key": "密钥（十六进制；可在下方生成 256 位密钥）",
+      "iv": "IV / 计数器（十六进制；留空则加密时生成）",
+      "aad": "附加认证数据（UTF-8）",
+      "inputFormat": "输入格式"
+    }
+  },
+  "crypto-serpent-cbc": {
+    "name": "Serpent-CBC",
+    "description": "CBC 模式 Serpent，PKCS#7 填充；密钥 16/24/32 字节。",
+    "help": "非认证兼容密码；密文被改动时无法可靠检测。加密输出含 16 字节 nonce/IV 与密文的 JSON 信封，从不包含密钥。解密会自动识别该信封。原始密文使用所选 Hex/Base64 格式及你提供的 IV。切勿对同一密钥重复使用 nonce/计数器。AAD 仅适用于认证模式。载荷上限 8 MiB。结果较大时，请保存 encrypted.json 并作为文件选择后再解密。",
+    "fields": {
+      "mode": "操作",
+      "key": "密钥（十六进制；可在下方生成 256 位密钥）",
+      "iv": "IV / 计数器（十六进制；留空则加密时生成）",
+      "aad": "附加认证数据（UTF-8）",
+      "inputFormat": "输入格式"
+    }
+  },
+  "crypto-camellia-cbc": {
+    "name": "Camellia-CBC",
+    "description": "CBC 模式 Camellia-128/192/256，PKCS#7 填充。",
+    "help": "非认证兼容密码；密文被改动时无法可靠检测。加密输出含 16 字节 nonce/IV 与密文的 JSON 信封，从不包含密钥。解密会自动识别该信封。原始密文使用所选 Hex/Base64 格式及你提供的 IV。切勿对同一密钥重复使用 nonce/计数器。AAD 仅适用于认证模式。载荷上限 8 MiB。结果较大时，请保存 encrypted.json 并作为文件选择后再解密。",
+    "fields": {
+      "mode": "操作",
+      "key": "密钥（十六进制；可在下方生成 256 位密钥）",
+      "iv": "IV / 计数器（十六进制；留空则加密时生成）",
+      "aad": "附加认证数据（UTF-8）",
+      "inputFormat": "输入格式"
+    }
+  },
+  "crypto-rsa-oaep": {
+    "name": "RSA-OAEP",
+    "description": "用 RSA-OAEP/SHA-256 与 PEM 密钥加密或解密短消息。",
+    "help": "在下方生成 2048 位密钥对，或粘贴兼容的 PEM 密钥。2048 位密钥配合 SHA-256 最多支持 190 字节明文。用公钥加密、私钥解密。",
+    "fields": {
+      "mode": "操作",
+      "key": "公钥 SPKI 或私钥 PKCS#8 PEM",
+      "inputFormat": "输入格式"
+    }
+  },
+  "crypto-pbkdf2": {
+    "name": "PBKDF2-SHA256",
+    "description": "由口令与盐值派生密钥字节。",
+    "help": "输入为 UTF-8 口令。输出包含十六进制与 Base64 密钥字节。迭代次数：1–2,000,000。",
+    "fields": {
+      "salt": "盐值（十六进制；建议至少 16 字节）",
+      "iterations": "迭代次数",
+      "length": "输出字节数（1–128）"
+    }
+  },
+  "crypto-hkdf": {
+    "name": "HKDF-SHA256",
+    "description": "由现有十六进制输入密钥、盐值与上下文派生密钥材料。",
+    "help": "输入是十六进制的现有密钥材料，不是口令。HKDF 不是口令硬化函数。",
+    "fields": {
+      "salt": "盐值（十六进制；可为空）",
+      "info": "上下文 / info（UTF-8）",
+      "length": "输出字节数（1–128）"
+    }
+  },
+  "jwt-verify": {
+    "name": "JWT 验证器",
+    "description": "用你的密钥验证 JWT 签名以及时间、issuer 与 audience 声明。",
+    "help": "独立于令牌选择期望算法。密钥只留在本地。若存在过期与 not-before 声明则会检查。",
+    "fields": {
+      "algorithm": "期望算法",
+      "keyFormat": "密钥格式",
+      "key": "密钥、JWK 或 PEM 公钥",
+      "issuer": "期望 issuer（可选）",
+      "audience": "期望 audience（可选）"
+    }
+  },
+  "cert-inspector": {
+    "name": "证书查看器",
+    "description": "检查 PEM 链或 DER 证书、名称、日期与 SHA-256 指纹。",
+    "help": "粘贴 PEM 或选择 PEM/DER 文件。文件优先。这是检查，不验证信任、签名与吊销。"
+  },
+  "hmac-calc": {
+    "name": "HMAC 计算器",
+    "description": "用 SHA-256、SHA-384 或 SHA-512 认证文本或文件字节。",
+    "fields": {
+      "algorithm": "算法",
+      "keyFormat": "密钥格式",
+      "key": "密钥"
+    }
+  },
+  "sri-generator": {
+    "name": "子资源完整性生成器",
+    "description": "由精确文本或文件字节生成 integrity 属性。",
+    "fields": {
+      "algorithm": "算法"
+    }
+  },
+  "url-diff": {
+    "name": "URL 比较",
+    "description": "并排比较 URL 组成部分与重复查询参数。",
+    "fields": {
+      "second": "第二个 URL"
+    }
+  },
+  "http-headers": {
+    "name": "HTTP 头查看器",
+    "description": "读取带说明的响应头，并保留重复字段。"
+  },
+  "sql-formatter": {
+    "name": "SQL 格式化",
+    "description": "校验所选 SQL 方言，并在保留注释的同时格式化查询。",
+    "fields": {
+      "dialect": "SQL 方言"
+    }
+  },
+  "graphql-formatter": {
+    "name": "GraphQL 格式化",
+    "description": "校验并格式化 GraphQL 查询或 schema 定义。",
+    "fields": {
+      "mode": "文档类型"
+    }
+  },
+  "json-patch": {
+    "name": "JSON Patch 工作台",
+    "description": "生成 RFC 6902 补丁，或应用补丁并查看结果文档。",
+    "fields": {
+      "mode": "操作",
+      "second": "更新后的文档 / 补丁"
+    }
+  },
+  "xml-json": {
+    "name": "JSON ↔ XML",
+    "description": "按已记录的结构映射在基于元素的 XML 与 JSON 之间转换。",
+    "help": "一个根键；属性用 @name，文本用 #text，重复元素变为数组。值变为字符串。拒绝命名空间、混合内容与 DTD。省略注释与格式空白；不同子元素名会分组，顺序可能改变。",
+    "fields": {
+      "mode": "方向"
+    }
+  },
+  "csv-workbench": {
+    "name": "CSV 工作台",
+    "description": "选择、重排、重命名、筛选与排序列；预览行并导出 CSV。",
+    "fields": {
+      "filterColumn": "筛选列（精确名称）",
+      "filterValue": "包含文本",
+      "sortColumn": "排序列（精确名称）",
+      "numeric": "按数值排序",
+      "descending": "降序"
+    }
+  },
+  "encoding-file": {
+    "name": "文件编码转换",
+    "description": "在 Unicode 与常见旧字符编码之间转换文本文件。",
+    "fields": {
+      "from": "源编码",
+      "to": "目标编码",
+      "bom": "包含 Unicode 字节序标记"
+    }
+  },
+  "archive-workbench": {
+    "name": "压缩包与压缩",
+    "description": "创建、浏览、测试、解压与重打包压缩包，或压缩与解压单个文件。",
+    "help": "创建将文件或文件夹打包为 ZIP、7z、RAR、TAR 或 TAR.GZ。检查、测试、解压与重打包读取已有压缩包。压缩与解压处理单个 gzip、Brotli 或 Zstd 流。全部在浏览器内完成。输入最多 32 MiB、压缩包条目最多 500、展开输出最多 64 MiB。",
+    "fields": {
+      "mode": "操作",
+      "format": "输出格式",
+      "password": "输入压缩包密码",
+      "archiveName": "输出压缩包名称（不含扩展名）",
+      "level": "压缩级别",
+      "outputPassword": "输出密码（ZIP / 7z / RAR；留空则不加密）",
+      "solid": "固实压缩（7z / RAR）",
+      "encryptNames": "加密文件名（7z / RAR）"
+    }
+  },
+  "image-compare": {
+    "name": "图像比较",
+    "description": "用揭示滑块、像素差异热力图与指标比较等尺寸图像。",
+    "help": "恰好选择两张尺寸相同的图片，各最多 4 百万像素。像素指标包含 alpha。"
+  },
+  "sprite-builder": {
+    "name": "精灵图生成器",
+    "description": "将图像排入网格，并导出带 JSON 与 CSS 坐标的 PNG 图集。",
+    "help": "文件按选择器顺序。单元格适配最大源图；图片保持原始尺寸。最多 64 张图，输出最多 8 百万像素。",
+    "fields": {
+      "columns": "列数",
+      "gap": "间距（像素）"
+    }
+  },
+  "favicon-builder": {
+    "name": "Favicon 生成器",
+    "description": "为浏览器、Apple touch icon 与 web manifest 创建 ICO 与 PNG 图标。",
+    "help": "将图片放入透明正方形。导出 16、32、48、64、180、192、256 与 512 像素 PNG，以及多尺寸 ICO。"
+  },
+  "apng-extract": {
+    "name": "APNG 查看与提取",
+    "description": "检查动画时序与操作；提取回退图与原始帧 PNG。",
+    "help": "帧是带偏移、disposal 与 blend 元数据的原始矩形，不是合成后的快照。最多 500 帧。"
+  },
+  "svg-optimizer": {
+    "name": "SVG 优化器",
+    "description": "优化 SVG 标记，比较字节大小并预览结果。",
+    "help": "会移除脚本、事件处理与 foreignObject；预览使用隔离图像。替换原文件前请检查结果。"
+  },
+  "palette-extractor": {
+    "name": "图像调色板提取",
+    "description": "提取按 alpha 加权的主色，含色板与占比。",
+    "help": "颜色按 4 位 RGB 分箱后取平均。完全透明像素排除；百分比相对全部可见像素。",
+    "fields": {
+      "count": "颜色数量（2–32）"
+    }
+  },
+  "json-typescript": {
+    "name": "JSON → TypeScript",
+    "description": "从示例 JSON 推断 TypeScript 类型，并合并数组中的对象形状。这描述样本，不是 API 契约。",
+    "optionLabel": "类型名称"
+  },
+  "json-schema": {
+    "name": "JSON Schema 校验器",
+    "description": "按 JSON Schema 校验 JSON。本地引用可用；不抓取远程引用。最多显示 100 条错误。",
+    "optionLabel": "JSON Schema"
+  },
+  "json-diff": {
+    "name": "结构化 JSON 差异",
+    "description": "按路径比较 JSON 值。忽略对象键顺序；数组位置有意义。",
+    "optionLabel": "更新后的 JSON"
+  },
+  "curl-fetch": {
+    "name": "cURL → fetch",
+    "description": "将受支持的单次 curl 命令转为 JavaScript。不发送请求。支持 -X、-H、-d、--data-raw、--data-binary 与 --url。"
+  },
+  "regex-playground": {
+    "name": "正则演练场",
+    "description": "高亮匹配并检查捕获组。Rust 正则语法：使用如 (?i) 的内联标志。无环视或反向引用；最多 1,000 次匹配。",
+    "optionLabel": "正则表达式"
+  },
+  "cron-explorer": {
+    "name": "Cron 计划浏览",
+    "description": "列出某日期之后的接下来 10 次运行。接受 5 字段，或秒 + 5 字段；年份可选。日期与星期同时约束匹配。",
+    "optionLabel": "起始日期（含 UTC 偏移）"
+  },
+  "env-diff": {
+    "name": ".env 比较",
+    "description": "比较字面单行 KEY=value 设置。支持 export 与简单引号；不展开变量或 shell 表达式。",
+    "optionLabel": "更新后的 .env"
+  },
+  "semver-test": {
+    "name": "Semver 范围测试",
+    "description": "测试 Cargo 风格版本要求：插入符、波浪号、通配符与逗号分隔比较。不支持 npm 的 || 与连字符范围。",
+    "optionLabel": "版本要求"
+  },
+  "hex-viewer": {
+    "name": "十六进制查看器",
+    "description": "按偏移、十六进制字节与 ASCII 检查本地文件。预览显示前 64 KiB；文件最大 1 MiB。"
+  },
+  "csp-inspector": {
+    "name": "CSP 查看器",
+    "description": "解析 Content-Security-Policy 指令，并标出重复项与过宽来源。这是结构检查，不是完整安全评估。"
+  },
+  "area": {
+    "name": "面积换算",
+    "description": "在 7 种单位之间换算面积。",
+    "optionLabel": "输入单位"
+  },
+  "volume": {
+    "name": "体积换算",
+    "description": "在 7 种单位之间换算体积。",
+    "optionLabel": "输入单位"
+  },
+  "speed": {
+    "name": "速度换算",
+    "description": "在 5 种单位之间换算速度。",
+    "optionLabel": "输入单位"
+  },
+  "pressure": {
+    "name": "压强换算",
+    "description": "在 7 种单位之间换算压强。",
+    "optionLabel": "输入单位"
+  },
+  "energy": {
+    "name": "能量换算",
+    "description": "在 7 种单位之间换算能量。",
+    "optionLabel": "输入单位"
+  },
+  "power": {
+    "name": "功率换算",
+    "description": "在 5 种单位之间换算功率。",
+    "optionLabel": "输入单位"
+  },
+  "angle": {
+    "name": "角度换算",
+    "description": "在 4 种单位之间换算角度。",
+    "optionLabel": "输入单位"
+  },
+  "frequency": {
+    "name": "频率换算",
+    "description": "在 5 种单位之间换算频率。",
+    "optionLabel": "输入单位"
+  },
+  "data-rate": {
+    "name": "数据传输速率换算",
+    "description": "在 6 种单位之间换算数据速率。",
+    "optionLabel": "输入单位"
+  },
+  "force": {
+    "name": "力换算",
+    "description": "在 5 种单位之间换算力。",
+    "optionLabel": "输入单位"
+  },
+  "json-to-yaml": {
+    "name": "JSON → YAML",
+    "description": "将 JSON 转为 YAML。"
+  },
+  "yaml-to-json": {
+    "name": "YAML → JSON",
+    "description": "将带字符串映射键的 YAML 转为 JSON。标签与非 JSON 值可能被拒绝。"
+  },
+  "json-to-toml": {
+    "name": "JSON → TOML",
+    "description": "将 JSON 对象转为 TOML。TOML 不支持 null 值。"
+  },
+  "toml-to-json": {
+    "name": "TOML → JSON",
+    "description": "将 TOML 文档转为 JSON。日期/时间值变为字符串。"
+  },
+  "yaml-to-toml": {
+    "name": "YAML → TOML",
+    "description": "将 YAML 映射转为 TOML。不支持 null 值。"
+  },
+  "toml-to-yaml": {
+    "name": "TOML → YAML",
+    "description": "将 TOML 转为 YAML。日期/时间值变为字符串。"
+  },
+  "json-to-jsonl": {
+    "name": "JSON → JSON Lines",
+    "description": "将数组中的每一项写到单独一行。"
+  },
+  "jsonl-to-json": {
+    "name": "JSON Lines → JSON",
+    "description": "将 JSON 行合并为数组。空行忽略。"
+  },
+  "csv-to-markdown": {
+    "name": "CSV → Markdown 表格",
+    "description": "将 CSV 表转为 Markdown，并转义竖线与换行。"
+  },
+  "rgb-to-hex": {
+    "name": "RGB → HEX",
+    "description": "将三个 RGB 通道值（0–255）转为十六进制颜色。"
+  },
+  "hsl-to-hex": {
+    "name": "HSL → HEX",
+    "description": "将色相（度）与饱和度/亮度百分比转为十六进制颜色。"
+  },
+  "unix-ms-to-date": {
+    "name": "Unix 毫秒 → 日期",
+    "description": "将 Unix 毫秒转为 UTC 日期。"
+  },
+  "date-to-unix-ms": {
+    "name": "日期 → Unix 毫秒",
+    "description": "将带时区的 RFC 3339 日期转为毫秒。"
+  },
+  "date-offset": {
+    "name": "UTC 偏移转换",
+    "description": "以固定 UTC 偏移表示同一时刻。不应用地区夏令时规则。",
+    "optionLabel": "UTC 偏移（分钟，例如 480 表示 +08:00）"
+  },
+  "unicode-escape": {
+    "name": "文本 → Unicode 转义",
+    "description": "将文本编码为 UTF-16 \\uXXXX 转义，包括代理对。"
+  },
+  "unicode-unescape": {
+    "name": "Unicode 转义 → 文本",
+    "description": "解码连续的 UTF-16 \\uXXXX 转义。"
+  },
+  "text-to-codepoints": {
+    "name": "文本 → 码点",
+    "description": "以十六进制列出 Unicode 标量值。"
+  },
+  "codepoints-to-text": {
+    "name": "码点 → 文本",
+    "description": "解码空格分隔的十六进制 Unicode 标量值。"
+  },
+  "image-png": {
+    "name": "图像 → PNG",
+    "description": "将本地图像转为无损 PNG。动画图像导出第一帧。"
+  },
+  "image-apng": {
+    "name": "APNG 动画生成器",
+    "description": "将图像合成为动画 PNG。可重排帧并设置各帧时长。"
+  },
+  "image-fallback-apng": {
+    "name": "带静态回退的 APNG",
+    "description": "创建静态回退图不同的 PNG，方式与所提供的 APNG 生成器相同。"
+  },
+  "image-rotate": {
+    "name": "图像旋转 90°",
+    "description": "使用 Rust 像素核心将图像顺时针旋转。"
+  },
+  "image-flip-horizontal": {
+    "name": "水平翻转图像",
+    "description": "将图像左右镜像。"
+  },
+  "image-flip-vertical": {
+    "name": "垂直翻转图像",
+    "description": "将图像上下镜像。"
+  },
+  "image-grayscale": {
+    "name": "图像灰度",
+    "description": "转为灰度并保留透明度。"
+  },
+  "image-invert": {
+    "name": "反转图像颜色",
+    "description": "反转 RGB 通道并保留透明度。"
+  },
+  "image-brightness": {
+    "name": "图像亮度",
+    "description": "为 RGB 通道加上亮度偏移。",
+    "optionLabel": "调整量（-255 到 255）"
+  },
+  "image-threshold": {
+    "name": "黑白阈值",
+    "description": "按灰度阈值将像素转为黑或白。",
+    "optionLabel": "阈值（0–255）"
+  },
+  "image-crop": {
+    "name": "裁剪图像",
+    "description": "提取矩形区域。坐标从左上角开始。",
+    "optionLabel": "x, y, 宽度, 高度（像素）"
+  },
+  "text-stats": {
+    "name": "文本统计",
+    "description": "统计词数、字符、字形簇、行数与字节。"
+  },
+  "uppercase": {
+    "name": "大写",
+    "description": "将所有字母转为大写。"
+  },
+  "lowercase": {
+    "name": "小写",
+    "description": "将所有字母转为小写。"
+  },
+  "title-case": {
+    "name": "标题大小写",
+    "description": "每个单词首字母大写；标点变为空格。"
+  },
+  "sentence-case": {
+    "name": "首字母大写",
+    "description": "将文本改为小写，并大写第一个字符。"
+  },
+  "camel-case": {
+    "name": "camelCase",
+    "description": "用小写开头的单词拼接词语。"
+  },
+  "pascal-case": {
+    "name": "PascalCase",
+    "description": "用首字母大写的单词拼接词语。"
+  },
+  "snake-case": {
+    "name": "snake_case",
+    "description": "用下划线分隔小写单词。"
+  },
+  "kebab-case": {
+    "name": "kebab-case",
+    "description": "用连字符分隔小写单词。"
+  },
+  "reverse-text": {
+    "name": "反转文本",
+    "description": "反转文本，并保持 emoji 与重音字符完整。"
+  },
+  "trim-lines": {
+    "name": "修剪行",
+    "description": "去除每行两端空白。"
+  },
+  "collapse-whitespace": {
+    "name": "折叠空白",
+    "description": "将连续空白替换为一个空格。"
+  },
+  "remove-empty-lines": {
+    "name": "删除空行",
+    "description": "删除空白行与仅含空白的行。"
+  },
+  "sort-lines": {
+    "name": "排序行",
+    "description": "按区分大小写的字典序排序各行。"
+  },
+  "reverse-lines": {
+    "name": "反转行序",
+    "description": "反转行的顺序。"
+  },
+  "unique-lines": {
+    "name": "去除重复行",
+    "description": "保留每条完全相同行的首次出现。"
+  },
+  "number-lines": {
+    "name": "行号",
+    "description": "为每一行加上行号前缀。"
+  },
+  "find-replace": {
+    "name": "查找与替换",
+    "description": "替换字面文本。将查找与替换内容分开放在不同行。",
+    "optionLabel": "查找 / 替换"
+  },
+  "regex-extract": {
+    "name": "正则提取",
+    "description": "用 Rust 正则语法提取匹配。无环视或反向引用。",
+    "optionLabel": "正则表达式"
+  },
+  "base64-encode": {
+    "name": "Base64 编码",
+    "description": "将 UTF-8 文本编码为 Base64。"
+  },
+  "base64-decode": {
+    "name": "Base64 解码",
+    "description": "将 Base64 解码为 UTF-8 文本。"
+  },
+  "base64url-encode": {
+    "name": "Base64URL 编码",
+    "description": "创建无填充的 URL-safe Base64。"
+  },
+  "base64url-decode": {
+    "name": "Base64URL 解码",
+    "description": "将 URL-safe Base64 解码为 UTF-8 文本。"
+  },
+  "hex-encode": {
+    "name": "十六进制编码",
+    "description": "将 UTF-8 字节编码为十六进制。"
+  },
+  "hex-decode": {
+    "name": "十六进制解码",
+    "description": "将十六进制解码为 UTF-8；接受空格、连字符、冒号以及 0x 或 \\x 前缀。"
+  },
+  "url-encode": {
+    "name": "URL 编码",
+    "description": "对 URL 组件做百分号编码。"
+  },
+  "url-decode": {
+    "name": "URL 解码",
+    "description": "解码百分号编码的组件；字面 + 会保留。"
+  },
+  "html-escape": {
+    "name": "HTML 转义",
+    "description": "转义文本以便用于 HTML。"
+  },
+  "json-escape": {
+    "name": "JSON 字符串转义",
+    "description": "将文本编码为带引号的 JSON 字符串。"
+  },
+  "json-unescape": {
+    "name": "JSON 字符串反转义",
+    "description": "解码带引号的 JSON 字符串。"
+  },
+  "json-format": {
+    "name": "JSON 格式化",
+    "description": "校验并美化打印 JSON。"
+  },
+  "json-minify": {
+    "name": "JSON 压缩",
+    "description": "校验 JSON 并移除不必要的空白。"
+  },
+  "json-keys": {
+    "name": "JSON 键",
+    "description": "列出对象的顶级键。"
+  },
+  "json-to-csv": {
+    "name": "JSON → CSV",
+    "description": "将对象数组转为带引号的 CSV 表。"
+  },
+  "csv-to-json": {
+    "name": "CSV → JSON",
+    "description": "将表头唯一的 CSV 转为 JSON 字符串。"
+  },
+  "csv-to-tsv": {
+    "name": "CSV → TSV",
+    "description": "将 CSV 转为带引号的制表符分隔值。"
+  },
+  "tsv-to-csv": {
+    "name": "TSV → CSV",
+    "description": "将制表符分隔值转为 CSV。"
+  },
+  "sha256": {
+    "name": "SHA-256",
+    "description": "对精确的 UTF-8 输入求哈希。"
+  },
+  "sha512": {
+    "name": "SHA-512",
+    "description": "对精确的 UTF-8 输入求哈希。"
+  },
+  "jwt-decode": {
+    "name": "JWT 查看器",
+    "description": "读取头部与载荷。不验证签名。"
+  },
+  "uuid": {
+    "name": "UUID 生成器",
+    "description": "用浏览器密码学随机数生成随机版本 4 UUID。"
+  },
+  "password": {
+    "name": "密码生成器",
+    "description": "用 64 字符字母表，借助浏览器密码学随机数生成密码。"
+  },
+  "file-sha256": {
+    "name": "文件 SHA-256",
+    "description": "选择文件以在本地计算其 SHA-256。最大 32 MB。"
+  },
+  "base-convert": {
+    "name": "进制转换",
+    "description": "将有符号整数转为二进制、八进制、十进制与十六进制。",
+    "optionLabel": "输入进制（2–36）"
+  },
+  "statistics": {
+    "name": "统计",
+    "description": "计算个数、总和、均值、中位数、极差与总体偏差。"
+  },
+  "percentage": {
+    "name": "百分比求值",
+    "description": "输入百分比与数值，用逗号分隔。"
+  },
+  "percentage-change": {
+    "name": "百分比变化",
+    "description": "输入旧值与新值，用逗号分隔。"
+  },
+  "gcd-lcm": {
+    "name": "GCD 与 LCM",
+    "description": "求最大公约数与最小公倍数。"
+  },
+  "temperature": {
+    "name": "温度换算",
+    "description": "在 C、F 与 K 之间换算。",
+    "optionLabel": "输入单位：C, F, K"
+  },
+  "length": {
+    "name": "长度换算",
+    "description": "换算公制与英制长度。",
+    "optionLabel": "输入单位：mm, cm, m, km, in, ft, yd, mi"
+  },
+  "mass": {
+    "name": "质量换算",
+    "description": "换算公制与英制质量。",
+    "optionLabel": "输入单位：mg, g, kg, oz, lb"
+  },
+  "bytes": {
+    "name": "数据大小换算",
+    "description": "比较十进制与二进制字节单位。",
+    "optionLabel": "输入单位：B, KB, MB, GB, KiB, MiB, GiB"
+  },
+  "duration": {
+    "name": "时长换算",
+    "description": "在不同单位之间换算时长。",
+    "optionLabel": "输入单位：ms, s, min, h, d"
+  },
+  "unix-to-date": {
+    "name": "Unix 时间戳 → 日期",
+    "description": "将 Unix 秒转为 UTC 的 ISO 日期。"
+  },
+  "date-to-unix": {
+    "name": "日期 → Unix 时间戳",
+    "description": "将带时区的 RFC 3339 日期转为 Unix 秒。"
+  },
+  "date-difference": {
+    "name": "日期差",
+    "description": "计算从第一个日期到第二个日期的日历天数。",
+    "optionLabel": "结束日期（YYYY-MM-DD）"
+  },
+  "date-add": {
+    "name": "加减天数",
+    "description": "增加或减少日历天数。",
+    "optionLabel": "要加的天数（负数为减去）"
+  },
+  "url-inspect": {
+    "name": "URL 查看器",
+    "description": "将绝对 URL 拆成各部分。"
+  },
+  "query-to-json": {
+    "name": "查询参数 → JSON",
+    "description": "从 URL 读取查询参数，并保留重复键。"
+  },
+  "slug": {
+    "name": "Slug 生成器",
+    "description": "将词语转为保留 Unicode 的 URL slug。"
+  },
+  "color-convert": {
+    "name": "颜色转换",
+    "description": "将十六进制颜色转为 RGB 与 HSL。"
+  },
+  "word-frequency": {
+    "name": "词频",
+    "description": "按出现频率给词语排序。"
+  },
+  "line-diff": {
+    "name": "文本比较",
+    "description": "比较两段文本，并高亮增删的行。",
+    "optionLabel": "新文本"
+  },
+  "rot13": {
+    "name": "ROT13",
+    "description": "将拉丁字母旋转 13 位。这不是加密。"
+  },
+  "binary-encode": {
+    "name": "文本 → 二进制",
+    "description": "将 UTF-8 字节编码为八位二进制组。"
+  },
+  "binary-decode": {
+    "name": "二进制 → 文本",
+    "description": "将八位二进制组解码为 UTF-8。"
+  },
+  "json-flatten": {
+    "name": "扁平化 JSON",
+    "description": "将叶值映射到 RFC 6901 JSON pointer。"
+  },
+  "json-pointer": {
+    "name": "JSON pointer",
+    "description": "用 JSON pointer 提取值。",
+    "optionLabel": "指针"
+  },
+  "json-merge": {
+    "name": "合并 JSON 对象",
+    "description": "浅合并两个对象。重复键以第二个对象为准。",
+    "optionLabel": "第二个对象"
+  },
+  "json-table": {
+    "name": "JSON 表格",
+    "description": "将对象数组作为表格浏览。"
+  },
+  "qr-code": {
+    "name": "QR 码生成器",
+    "description": "创建可扫描的 QR 码并保存为 SVG。"
+  },
+  "contrast": {
+    "name": "颜色对比度",
+    "description": "按 WCAG 2 对比度阈值比较两种颜色。",
+    "optionLabel": "背景色"
+  },
+  "palette": {
+    "name": "调色板",
+    "description": "由一种颜色生成九个深浅变化。"
+  },
+  "ipv4-subnet": {
+    "name": "IPv4 子网计算器",
+    "description": "检查 CIDR 网络边界与地址数量。"
+  },
+  "url-builder": {
+    "name": "URL 构建器",
+    "description": "追加已编码的查询参数。数组变为重复键。",
+    "optionLabel": "查询参数（JSON）"
+  },
+  "uuid-inspect": {
+    "name": "UUID 查看器",
+    "description": "检查十六进制 UUID 字段；仅版本半字节不能验证生成方式。"
+  },
+  "aspect-ratio": {
+    "name": "宽高比",
+    "description": "将宽高简化为比例，并预览比例效果。"
+  },
+  "roman-numeral": {
+    "name": "罗马数字",
+    "description": "转换 1 到 3999 的整数。"
+  },
+  "prime-factors": {
+    "name": "质因数分解",
+    "description": "分解不超过一万亿的整数。"
+  },
+  "sort-numbers": {
+    "name": "数字排序",
+    "description": "将数值从低到高排序。"
+  },
+  "date-inspect": {
+    "name": "日历日期查看器",
+    "description": "检查星期、ISO 周、年积日与闰年。"
+  },
+  "markdown-preview": {
+    "name": "Markdown 预览",
+    "description": "渲染含表格、列表与代码的 Markdown。脚本与远程资源会被拦截。"
+  },
+  "html-preview": {
+    "name": "HTML 预览",
+    "description": "在隔离框架中预览 HTML。脚本与远程资源会被拦截。"
+  },
+  "image-inspect": {
+    "name": "图像查看器",
+    "description": "检查本地图像，并预览尺寸与文件信息。"
+  },
+  "image-resize": {
+    "name": "图像缩放",
+    "description": "将本地图像缩放到最大宽度内，保持宽高比。保存为 PNG。",
+    "optionLabel": "最大宽度（像素）"
+  },
+  "image-webp": {
+    "name": "图像 → WebP",
+    "description": "将本地图像转为 WebP。",
+    "optionLabel": "质量（1–100）"
+  },
+  "image-jpeg": {
+    "name": "图像 → JPEG",
+    "description": "将本地图像转为带白色背景的 JPEG。",
+    "optionLabel": "质量（1–100）"
+  }
+}

@@ -4,6 +4,7 @@ import type { FFmpeg } from "@ffmpeg/ffmpeg";
 import type { SuiteOptions, SuiteResult } from "../workbench-types";
 import { MEDIA_LIMIT, planMedia, type MediaInfo } from "./plan";
 import { armTimeout, overLimit } from "../limits";
+import { t } from "../i18n";
 
 type MediaControls = {
   status: HTMLElement;
@@ -24,16 +25,16 @@ export function configureMedia(
   const status = document.createElement("p");
   status.dataset.mediaStatus = "";
   status.setAttribute("role", "status");
-  status.textContent = "FFmpeg is ready to load when you run a tool.";
+  status.textContent = t("mediaReady");
   const cancel = document.createElement("button");
   cancel.type = "button";
-  cancel.textContent = "Cancel processing";
+  cancel.textContent = t("cancelProcessing");
   cancel.dataset.mediaCancel = "";
   cancel.disabled = true;
   cancel.onclick = cancelMedia;
   const details = document.createElement("details");
   const summary = document.createElement("summary");
-  summary.textContent = "Processing log";
+  summary.textContent = t("processingLog");
   const log = document.createElement("pre");
   log.dataset.mediaLog = "";
   log.className = "media-log";
@@ -41,7 +42,7 @@ export function configureMedia(
   container.append(status, cancel, details);
   if (multiple) {
     const order = document.createElement("ol");
-    order.setAttribute("aria-label", "Audio join order");
+    order.setAttribute("aria-label", t("audioJoinOrder"));
     const renderOrder = () => {
       const files = joinOrders.get(container) ?? [];
       order.replaceChildren(

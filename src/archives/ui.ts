@@ -2,10 +2,15 @@
 import { suiteCore } from "../workbench-core";
 import type { SuiteOptions, SuiteResult } from "../workbench-types";
 import { formBypassLimits, overLimit } from "../limits";
+import { formatNumber, t } from "../i18n";
 const INPUT_LIMIT = 32 * 1024 * 1024;
 type Source = { file: File; name: string };
 type State = { sources: Source[]; selected?: string[] };
 const states = new WeakMap<HTMLElement, State>();
+const archiveRefresh = new WeakMap<HTMLElement, () => void>();
+export function refreshArchives(container: HTMLElement): void {
+  archiveRefresh.get(container)?.();
+}
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string) {
   const result = document.createElement(tag);
   if (text !== undefined) result.textContent = text;
@@ -103,23 +108,25 @@ export function configureArchives(
     picker.multiple = action === "create";
     pickerLabel.textContent =
       action === "create"
-        ? "Add files"
+        ? t("addFiles")
         : streaming
-          ? "Choose file"
-          : "Choose archive";
+          ? t("chooseFile")
+          : t("chooseArchive");
     container.querySelector<HTMLLabelElement>(
       'label[for="suite-format"]',
-    )!.textContent = action === "decompress" ? "Input format" : "Output format";
+    )!.textContent =
+      action === "decompress" ? t("inputFormat") : t("outputFormatLabel");
     builder.hidden = action !== "create";
     browser.hidden = (writing && action !== "repack") || streaming;
     description.textContent = streaming
-      ? "Compress/decompress one stream. Use Create with TAR.GZ to combine multiple files. Expanded output is limited to 64 MiB; Zstd supports one standard frame without a dictionary."
+      ? t("archiveStreamHelp")
       : action === "create"
-        ? "Edit archive paths or remove files below. ZIP, 7z and RAR support password protection. RAR output uses the RAR5 format. Solid compression and encrypted filenames are available for 7z and RAR. Folder selection preserves file paths, but empty folders are omitted."
-        : "Browse to select files; otherwise all safe files are selected. ZIP, 7z, RAR, TAR and TAR.GZ are detected automatically. Test reads file contents and verifies available checksums. Unsafe paths, duplicate names and links are skipped. Individual downloads use flattened names; Repack preserves safe paths but omits empty directories and original metadata. Repack output is unencrypted unless you set an output password. Split volumes, SFX and native archive updating are not supported. RAR dictionaries are limited to 64 MiB.";
+        ? t("archiveCreateHelp")
+        : t("archiveBrowseHelp");
   };
   mode.addEventListener("change", update);
   format.addEventListener("change", update);
+  archiveRefresh.set(container, update);
   update();
 }
 function setupBuilder(
@@ -131,21 +138,29 @@ function setupBuilder(
   const { wrapper, controls, status, list } = panel();
   const render = () => {
     list.replaceChildren();
-    status.textContent = `${state.sources.length} files · ${state.sources.reduce((sum, source) => sum + source.file.size, 0).toLocaleString()} bytes`;
+    status.textContent = t("archiveFilesBytes", {
+      n: formatNumber(state.sources.length),
+      bytes: formatNumber(
+        state.sources.reduce((sum, source) => sum + source.file.size, 0),
+      ),
+    });
     state.sources.forEach((source, index) => {
       const row = node("div");
       row.className = "archive-source";
       const path = node("input");
       path.value = source.name;
-      path.setAttribute("aria-label", `Archive path for ${source.file.name}`);
+      path.setAttribute(
+        "aria-label",
+        t("archivePath", { name: source.file.name }),
+      );
       path.oninput = () => {
         source.name = path.value;
         changed();
       };
       row.append(
         path,
-        node("span", `${source.file.size.toLocaleString()} bytes`),
-        button("Remove", () => {
+        node("span", t("nBytes", { n: formatNumber(source.file.size) })),
+        button(t("remove"), () => {
           state.sources.splice(index, 1);
           render();
           changed();
@@ -200,8 +215,8 @@ function setupBuilder(
     folder.value = "";
   };
   controls.append(
-    button("Add folder", () => folder.click()),
-    button("Clear archive files", () => {
+    button(t("addFolder"), () => folder.click()),
+    button(t("clearArchiveFiles"), () => {
       state.sources = [];
       render();
       changed();
@@ -224,12 +239,11 @@ function setupExplorer(
     revision++;
     delete state.selected;
     list.replaceChildren();
-    status.textContent =
-      "Browse entries to choose files, or Run to process all safe files.";
+    status.textContent = t("archiveBrowseHint");
   };
   picker.addEventListener("change", reset);
   field(container, "password").addEventListener("input", reset);
-  const browse = button("Browse entries", () => {
+  const browse = button(t("browseEntries"), () => {
     void inspect();
   });
   const inspect = async () => {
@@ -237,7 +251,7 @@ function setupExplorer(
     delete state.selected;
     list.replaceChildren();
     browse.disabled = true;
-    status.textContent = "Reading archive…";
+    status.textContent = t("readingArchive");
     try {
       const file = picker.files?.[0];
       if (!file) throw Error("Choose an archive first.");
@@ -260,15 +274,18 @@ function setupExplorer(
       const checks: HTMLInputElement[] = [];
       const update = () => {
         state.selected = checks.filter((c) => c.checked).map((c) => c.value);
-        status.textContent = `${state.selected.length} selected / ${rows.length} entries`;
+        status.textContent = t("archiveSelected", {
+          n: formatNumber(state.selected.length),
+          total: formatNumber(rows.length),
+        });
         changed();
       };
       list.append(
-        button("Select all safe files", () => {
+        button(t("selectAllSafe"), () => {
           checks.forEach((c) => (c.checked = !c.disabled));
           update();
         }),
-        button("Clear selection", () => {
+        button(t("hashClear"), () => {
           checks.forEach((c) => (c.checked = false));
           update();
         }),

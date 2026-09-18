@@ -20,8 +20,13 @@ drafts.save("oversized", { input: "x".repeat(2_000_001), option: "" });
 assert.equal(drafts.read("oversized"), undefined);
 
 const window = new Window({ settings: { enableJavaScriptEvaluation: false } });
+Object.defineProperty(window.navigator, "language", { value: "en-US" });
+Object.defineProperty(window.navigator, "languages", { value: ["en-US"] });
 window.document.write(await Bun.file("dist/index.html").text());
-Object.assign(globalThis, { document: window.document });
+Object.assign(globalThis, {
+  document: window.document,
+  navigator: window.navigator,
+});
 const selected: string[] = [];
 const directory = configureDirectory(tools, (id) => selected.push(id));
 const get = (id: string) =>

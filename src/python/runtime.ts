@@ -7,6 +7,7 @@ import {
   type PythonMessage,
 } from "./protocol";
 import { armTimeout, bypassLimits, overLimit } from "../limits";
+import { t } from "../i18n";
 
 let activeCancel: (() => void) | undefined;
 let activeTerminal: ReturnType<typeof createTerminal> | undefined;
@@ -42,21 +43,21 @@ export function configurePython(
   const status = document.createElement("p");
   status.dataset.pythonStatus = "";
   status.setAttribute("role", "status");
-  status.textContent = "Python is ready to load on your first run.";
+  status.textContent = t("pythonReady");
   const stop = document.createElement("button");
   stop.type = "button";
   stop.dataset.pythonStop = "";
-  stop.textContent = "Stop Python";
+  stop.textContent = t("stopPython");
   stop.disabled = true;
   stop.onclick = cancelPython;
   const label = document.createElement("h3");
-  label.textContent = "Console";
+  label.textContent = t("pythonConsole");
   const output = document.createElement("pre");
   output.dataset.pythonConsole = "";
   output.className = "python-console";
-  output.setAttribute("aria-label", "Python console");
+  output.setAttribute("aria-label", t("pythonConsoleAria"));
   output.tabIndex = 0;
-  output.textContent = "Output will appear here.";
+  output.textContent = t("pythonOutput");
   output.hidden = label.hidden = analysis;
   const terminal = document.createElement("div");
   terminal.dataset.pythonTerminal = "";

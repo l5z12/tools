@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { DatabaseBrowser } from "./inspector";
+import { t } from "../i18n";
 
 function select(container: HTMLElement, key: string): HTMLSelectElement {
   return container.querySelector<HTMLSelectElement>(`#suite-${key}`)!;
@@ -32,8 +33,8 @@ export function configureDatabaseControls(
   page.step = "1";
   const navigation = document.createElement("div");
   for (const [label, delta] of [
-    ["Previous page", -1],
-    ["Next page", 1],
+    [t("previousPage"), -1],
+    [t("nextPage"), 1],
   ] as const) {
     const button = document.createElement("button");
     button.type = "button";
@@ -49,10 +50,10 @@ export function configureDatabaseControls(
   }
   container.append(navigation);
   function resetSort() {
-    choices(sort, [{ value: "", label: "Default order" }], "");
+    choices(sort, [{ value: "", label: t("defaultOrder") }], "");
   }
   function resetTable() {
-    choices(table, [{ value: "", label: "Read the selected file first" }], "");
+    choices(table, [{ value: "", label: t("readFileFirst") }], "");
     page.value = "1";
     resetSort();
   }
@@ -98,7 +99,7 @@ export function updateDatabaseControls(
           value: table.name,
           label: `${table.name} (${table.type})`,
         }))
-      : [{ value: "", label: "No user tables or views" }],
+      : [{ value: "", label: t("noUserTables") }],
     result.selected,
   );
   const sort = select(container, "sort");
@@ -106,7 +107,7 @@ export function updateDatabaseControls(
   choices(
     sort,
     [
-      { value: "", label: "Default order" },
+      { value: "", label: t("defaultOrder") },
       ...result.columns.map((name) => ({ value: name, label: name })),
     ],
     selectedSort,

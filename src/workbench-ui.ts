@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { workbenchTools, workbenchIds } from "./lib/workbench-tools";
 import { suiteCore } from "./workbench-core";
-import { configureHashes, selectedHashes } from "./hash-controls";
+import {
+  configureHashes,
+  refreshHashes,
+  selectedHashes,
+} from "./hash-controls";
 import { hashSuite } from "./hash-runtime";
 import { configureFingerprintProfile } from "./browser-fingerprint/controls";
-import { configureArchives, runArchives } from "./archives/ui";
+import { configureArchives, refreshArchives, runArchives } from "./archives/ui";
 import { mediaIds } from "./lib/media-tools";
 import { pythonIds } from "./lib/python-tools";
 import { rustCompilerIds } from "./lib/rust-tools";
@@ -31,6 +35,8 @@ import { formBypassLimits, overLimit } from "./limits";
 import { configureReference, queryReference, referenceIds } from "./references";
 import { clearWorkbenchView, renderWorkbenchView } from "./workbench-view";
 import { element } from "./ui/dom";
+import { choiceLabel, localizedWorkbench, t } from "./i18n";
+import type { Workbench } from "./lib/tool-types";
 export { workbenchIds };
 export { downloadSuite } from "./workbench-view";
 
@@ -38,6 +44,55 @@ let currentId = "";
 let invalidate = () => {};
 let columnVersion = 0;
 const root = () => document.getElementById("suite-controls")!;
+
+function filePickerLabel(id: string, tool: Workbench): string {
+  if (tool.inputMode === "optional-file")
+    return sqlRuntimeIds.has(id) ? t("optionalSqlite") : t("optionalFile");
+  return tool.multiple ? t("chooseFiles") : t("chooseFile");
+}
+
+function setFieldLabel(label: HTMLLabelElement, text: string): void {
+  const input = label.querySelector("input");
+  label.textContent = text;
+  if (input) label.prepend(input);
+}
+
+export function refreshSuiteLocale(): void {
+  const container = root();
+  if (!currentId || container.hidden) return;
+  const tool = workbenchTools.find((item) => item.id === currentId);
+  if (!tool) return;
+  const localized = localizedWorkbench(tool);
+  const help = container.querySelector<HTMLElement>("[data-suite-help]");
+  if (help && localized.help) help.textContent = localized.help;
+  const usage = container.querySelector(".usage-help summary");
+  if (usage) usage.textContent = t("usageLimits");
+  for (const field of localized.fields) {
+    const label = container.querySelector<HTMLLabelElement>(
+      `label[for="suite-${field.key}"]`,
+    );
+    if (label) setFieldLabel(label, field.label);
+    const input = container.querySelector<HTMLSelectElement>(
+      `#suite-${field.key}`,
+    );
+    if (input instanceof HTMLSelectElement)
+      for (const option of input.options)
+        option.textContent = choiceLabel(option.value);
+  }
+  const pickerLabel = container.querySelector<HTMLLabelElement>(
+    'label[for="suite-file"]',
+  );
+  if (pickerLabel) pickerLabel.textContent = filePickerLabel(currentId, tool);
+  const clearFile = container.querySelector<HTMLElement>("[data-clear-file]");
+  if (clearFile) clearFile.textContent = t("clearFile");
+  const readColumns = container.querySelector<HTMLElement>(
+    "[data-read-columns]",
+  );
+  if (readColumns) readColumns.textContent = t("readColumns");
+  refreshHashes(container);
+  refreshArchives(container);
+}
+
 export function configureSuite(
   id: string,
   onChange: () => void,
@@ -58,6 +113,7 @@ export function configureSuite(
   const tool = workbenchTools.find((t) => t.id === id);
   container.hidden = !tool;
   if (!tool) return;
+  const localized = localizedWorkbench(tool);
   document.getElementById("file-field")!.hidden = true;
   document.getElementById("animation-options")!.hidden = true;
   const hide =
@@ -66,26 +122,22 @@ export function configureSuite(
     tool.inputMode === "none";
   document.getElementById("input")!.hidden = hide;
   document.querySelector<HTMLElement>(".field-header")!.hidden = hide;
-  if (tool.help) {
-    if (tool.help.length > 240) {
+  if (localized.help) {
+    if (localized.help.length > 240) {
       const help = element("details");
       help.className = "usage-help";
-      help.append(
-        element("summary", "Usage & limits"),
-        element("p", tool.help),
-      );
+      const body = element("p", localized.help);
+      body.dataset.suiteHelp = "";
+      help.append(element("summary", t("usageLimits")), body);
       container.append(help);
-    } else container.append(element("p", tool.help));
+    } else {
+      const help = element("p", localized.help);
+      help.dataset.suiteHelp = "";
+      container.append(help);
+    }
   }
   if (tool.inputMode && tool.inputMode !== "none") {
-    const label = element(
-      "label",
-      tool.inputMode === "optional-file"
-        ? sqlRuntimeIds.has(id)
-          ? "Optional SQLite database (SQL runs against a fresh copy)"
-          : "Optional file (takes precedence over text)"
-        : "Choose file" + (tool.multiple ? "s" : ""),
-    );
+    const label = element("label", filePickerLabel(id, tool));
     label.htmlFor = "suite-file";
     const picker = element("input");
     picker.type = "file";
@@ -97,9 +149,10 @@ export function configureSuite(
         ? "image/png,image/jpeg,image/webp,image/gif,image/avif,image/bmp"
         : "");
     container.append(label, picker);
-    const clear = element("button", "Clear file selection");
+    const clear = element("button", t("clearFile"));
     clear.type = "button";
     clear.className = "link-button";
+    clear.dataset.clearFile = "";
     clear.onclick = () => {
       picker.value = "";
       picker.dispatchEvent(new Event("change", { bubbles: true }));
@@ -108,14 +161,14 @@ export function configureSuite(
     container.append(clear);
   }
   if (id === "hash-workbench") configureHashes(container, onChange);
-  for (const f of tool.fields) {
+  for (const f of localized.fields) {
     const label = element("label", f.label);
     label.htmlFor = "suite-" + f.key;
     let input: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
     if (f.choices) {
       input = element("select");
       f.choices.forEach((c) => {
-        const option = element("option", c);
+        const option = element("option", choiceLabel(c));
         option.value = c;
         input.append(option);
       });
@@ -150,8 +203,9 @@ export function configureSuite(
   if (sqlRuntimeIds.has(id)) configureSqlite(container);
   if (id === "sql-schema") configureDatabaseControls(container, onRun);
   if (id === "csv-workbench") {
-    const button = element("button", "Read columns");
+    const button = element("button", t("readColumns"));
     button.type = "button";
+    button.dataset.readColumns = "";
     const status = element("p");
     status.setAttribute("role", "status");
     const columns = element("div");
@@ -161,7 +215,7 @@ export function configureSuite(
       const source = (document.getElementById("input") as HTMLTextAreaElement)
         .value;
       button.disabled = true;
-      status.textContent = "Reading columns…";
+      status.textContent = t("readingColumns");
       try {
         const r = await suiteCore(id, source, new Uint8Array(), {
           preview: true,
@@ -171,7 +225,7 @@ export function configureSuite(
           source !==
           (document.getElementById("input") as HTMLTextAreaElement).value
         ) {
-          status.textContent = "Input changed. Read columns again.";
+          status.textContent = t("columnsChanged");
           return;
         }
         columns.replaceChildren();
@@ -182,13 +236,13 @@ export function configureSuite(
           const check = element("input");
           check.type = "checkbox";
           check.checked = true;
-          check.setAttribute("aria-label", "Include " + key);
+          check.setAttribute("aria-label", t("includeColumn", { name: key }));
           const name = element("input");
           name.value = key;
-          name.setAttribute("aria-label", "Output name for " + key);
+          name.setAttribute("aria-label", t("outputNameFor", { name: key }));
           const up = element("button", "↑");
           up.type = "button";
-          up.setAttribute("aria-label", "Move " + key + " up");
+          up.setAttribute("aria-label", t("moveUp", { name: key }));
           up.onclick = () => {
             if (row.previousElementSibling)
               columns.insertBefore(row, row.previousElementSibling);
@@ -196,7 +250,7 @@ export function configureSuite(
           };
           const down = element("button", "↓");
           down.type = "button";
-          down.setAttribute("aria-label", "Move " + key + " down");
+          down.setAttribute("aria-label", t("moveDown", { name: key }));
           down.onclick = () => {
             if (row.nextElementSibling)
               columns.insertBefore(row.nextElementSibling, row);
@@ -205,8 +259,7 @@ export function configureSuite(
           row.append(check, element("span", key), name, up, down);
           columns.append(row);
         }
-        status.textContent =
-          "Select columns, edit their output names, and use arrows to reorder.";
+        status.textContent = t("columnsHint");
         invalidate();
       } catch (e) {
         status.textContent = String(e);
@@ -248,8 +301,7 @@ export async function executeSuite(
   }
   if (id === "hash-workbench") {
     options.algorithms = selectedHashes(root());
-    if (!(options.algorithms as string[]).length)
-      throw Error("Select at least one hash or checksum variant.");
+    if (!(options.algorithms as string[]).length) throw Error(t("selectHash"));
   }
   if (id === "csv-workbench") {
     const rows = Array.from(
@@ -293,10 +345,10 @@ export async function executeSuite(
     });
   }
   if (tool.inputMode === "file" && !files.length)
-    throw Error("Choose a file first.");
+    throw Error(t("chooseFileFirst"));
   const f = files[0];
   if (f && overLimit(f.size, 32 * 1024 * 1024, options))
-    throw Error("File exceeds 32 MiB.");
+    throw Error(t("file32MiB"));
   options.fileProvided = !!f;
   options.filename = f?.name;
   const bytes = f ? new Uint8Array(await f.arrayBuffer()) : new Uint8Array();

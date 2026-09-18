@@ -1,11 +1,57 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { hashAlgorithms, popularHashes } from "./lib/hash-tools";
+import { choiceLabel, formatNumber, t, type MessageKey } from "./i18n";
 
 export function selectedHashes(container: HTMLElement): string[] {
   return Array.from(
     container.querySelectorAll<HTMLInputElement>("[data-hash]:checked"),
     (input) => input.value,
   );
+}
+
+const groupsByFieldset = new WeakMap<
+  HTMLElement,
+  {
+    summary: HTMLElement;
+    inputs: HTMLInputElement[];
+    category: string;
+  }[]
+>();
+
+function updateHashes(fieldset: HTMLElement): void {
+  const selected = selectedHashes(fieldset);
+  const status = fieldset.querySelector<HTMLElement>("[data-hash-status]");
+  if (status)
+    status.textContent = selected.length
+      ? t("hashSelected", {
+          n: formatNumber(selected.length),
+          names: selected.join(", "),
+        })
+      : t("hashNone");
+  for (const group of groupsByFieldset.get(fieldset) ?? []) {
+    const count = group.inputs.filter((input) => input.checked).length;
+    group.summary.textContent = t("hashGroup", {
+      category: choiceLabel(group.category),
+      n: formatNumber(count),
+      total: formatNumber(group.inputs.length),
+    });
+  }
+}
+
+export function refreshHashes(container: HTMLElement): void {
+  const fieldset = container.querySelector<HTMLElement>(".hash-selection");
+  if (!fieldset) return;
+  const legend = fieldset.querySelector("legend");
+  if (legend) legend.textContent = t("hashLegend");
+  for (const button of fieldset.querySelectorAll<HTMLElement>(
+    "[data-hash-preset]",
+  )) {
+    const key = button.dataset.hashPreset;
+    if (key === "popular") button.textContent = t("hashPopular");
+    if (key === "all") button.textContent = t("hashSelectAll");
+    if (key === "clear") button.textContent = t("hashClear");
+  }
+  updateHashes(fieldset);
 }
 
 export function configureHashes(
@@ -15,27 +61,18 @@ export function configureHashes(
   const fieldset = document.createElement("fieldset");
   fieldset.className = "hash-selection";
   const legend = document.createElement("legend");
-  legend.textContent = "Hash and checksum variants";
+  legend.textContent = t("hashLegend");
   const actions = document.createElement("div");
   actions.className = "hash-presets";
   const status = document.createElement("p");
+  status.dataset.hashStatus = "";
   status.setAttribute("role", "status");
   const groups: {
     summary: HTMLElement;
     inputs: HTMLInputElement[];
     category: string;
   }[] = [];
-
-  function update(): void {
-    const selected = selectedHashes(fieldset);
-    status.textContent = selected.length
-      ? `${selected.length} selected: ${selected.join(", ")}`
-      : "Select at least one variant.";
-    for (const group of groups) {
-      const count = group.inputs.filter((input) => input.checked).length;
-      group.summary.textContent = `${group.category} (${count}/${group.inputs.length} selected)`;
-    }
-  }
+  groupsByFieldset.set(fieldset, groups);
 
   function select(names: readonly string[]): void {
     const selected = new Set(names);
@@ -43,18 +80,19 @@ export function configureHashes(
       "[data-hash]",
     ))
       input.checked = selected.has(input.value);
-    update();
+    updateHashes(fieldset);
   }
 
-  const presets: [string, readonly string[]][] = [
-    ["Popular", popularHashes],
-    ["Select all", hashAlgorithms.map((algorithm) => algorithm.name)],
-    ["Clear selection", []],
+  const presets: [MessageKey, string, readonly string[]][] = [
+    ["hashPopular", "popular", popularHashes],
+    ["hashSelectAll", "all", hashAlgorithms.map((algorithm) => algorithm.name)],
+    ["hashClear", "clear", []],
   ];
-  for (const [label, names] of presets) {
+  for (const [key, preset, names] of presets) {
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = label;
+    button.textContent = t(key);
+    button.dataset.hashPreset = preset;
     button.onclick = () => {
       select(names);
       onChange();
@@ -86,8 +124,7 @@ export function configureHashes(
     details.append(summary, choices);
     fieldset.append(details);
   }
-  // The workbench's delegated change listener invalidates existing results.
-  fieldset.addEventListener("change", update);
+  fieldset.addEventListener("change", () => updateHashes(fieldset));
   select(popularHashes);
   container.append(fieldset);
 }

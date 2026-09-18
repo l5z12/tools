@@ -53,7 +53,7 @@ const starterTools = starterIds.map((id) => {
     <script is:inline src="/theme.js"></script>
   </head>
   <body>
-    <a class="skip" href="#search">
+    <a class="skip" href="#search" data-i18n="skipToSearch">
       Skip to search
     </a>
     <main class="page">
@@ -65,36 +65,51 @@ const starterTools = starterIds.map((id) => {
         <hr class="rule" />
         <div class="heading">
           <div class="site-brand">
-            <a href="/" data-home>
+            <a href="/" data-home data-i18n="brand">
               Tools
             </a>
           </div>
-          <span class="muted mono">
+          <span
+            class="muted mono"
+            data-i18n="catalogCounts"
+            data-i18n-n={tools.length}
+            data-i18n-h={hashtags.length}
+          >
             {tools.length} utilities / {hashtags.length} hashtags
           </span>
         </div>
-        <p class="intro">
+        <p class="intro" data-i18n="intro">
           Small tools for everyday work. Your inputs stay in this browser.
         </p>
         <p class="external-tools">
-          Also by L5Z12:{" "}
-          <a href="https://geoip.l5z12.dev">GeoIP — IP location lookup ↗</a>
+          <span data-i18n="alsoBy">Also by L5Z12:</span>{" "}
+          <a href="https://geoip.l5z12.dev" data-i18n="geoip">
+            GeoIP — IP location lookup ↗
+          </a>
         </p>
       </header>
       <section class="directory" aria-label="Tool directory">
         <div class="search-heading">
-          <label for="search">Find a tool</label>
+          <label for="search" data-i18n="findATool">
+            Find a tool
+          </label>
           <span class="muted mono">Ctrl / ⌘ K</span>
         </div>
         <input
           id="search"
           type="search"
           placeholder="Search tools, keywords, or #tags…"
+          data-i18n-placeholder="searchPlaceholder"
           autocomplete="off"
           aria-describedby="search-help"
         />
-        <nav id="tag-filters" class="groups" aria-label="Filter by hashtags">
-          <button id="all-tags" type="button">
+        <nav
+          id="tag-filters"
+          class="groups"
+          aria-label="Filter by hashtags"
+          data-i18n-aria="filterByHashtags"
+        >
+          <button id="all-tags" type="button" data-i18n="allTools">
             All tools
           </button>
           {hashtags.map((tag) => (
@@ -118,16 +133,22 @@ const starterTools = starterIds.map((id) => {
         >
           All {hashtags.length} hashtags
         </button>
-        <p id="search-help" class="muted filter-help">
+        <p id="search-help" class="muted filter-help" data-i18n="searchHelp">
           Combine hashtags to narrow results. Enter opens the first match; ↓
           moves into the list.
         </p>
-        <button id="clear-search" class="link-button" type="button" hidden>
+        <button
+          id="clear-search"
+          class="link-button"
+          type="button"
+          hidden
+          data-i18n="clearSearch"
+        >
           Clear search & filters
         </button>
         <details id="index">
           <summary>
-            <span>Browse the complete index</span>
+            <span data-i18n="browseIndex">Browse the complete index</span>
             <span id="match-count" role="status" aria-live="polite">
               {tools.length} tools
             </span>
@@ -149,7 +170,7 @@ const starterTools = starterIds.map((id) => {
               </article>
             ))}
           </div>
-          <p id="no-results" hidden>
+          <p id="no-results" hidden data-i18n="noResults">
             No tools match these filters. Try a shorter search or clear the
             filters above.
           </p>
@@ -158,6 +179,7 @@ const starterTools = starterIds.map((id) => {
           id="recent-tools"
           class="recent-tools"
           aria-label="Recently used tools"
+          data-i18n-aria="recentlyUsed"
           hidden
         ></nav>
         <section
@@ -165,10 +187,15 @@ const starterTools = starterIds.map((id) => {
           aria-labelledby="start-title"
           hidden={Boolean(tool)}
         >
-          <h1 id="start-title" tabindex="-1" class="view-title">
+          <h1
+            id="start-title"
+            tabindex="-1"
+            class="view-title"
+            data-i18n="startHere"
+          >
             Start here
           </h1>
-          <p class="muted">
+          <p class="muted" data-i18n="startHelp">
             Find a tool above, browse by hashtag, or jump into an everyday task.
           </p>
           <p id="route-message" role="status" hidden></p>
@@ -199,13 +226,23 @@ const starterTools = starterIds.map((id) => {
             {tool?.name}
           </h1>
           <div>
-            <a href="/" class="link-button" data-home>
+            <a href="/" class="link-button" data-home data-i18n="home">
               Home
             </a>
-            <button id="find-tool" class="link-button" type="button">
+            <button
+              id="find-tool"
+              class="link-button"
+              type="button"
+              data-i18n="findAnother"
+            >
               Find another tool
             </button>
-            <button id="copy-tool-link" class="link-button" type="button">
+            <button
+              id="copy-tool-link"
+              class="link-button"
+              type="button"
+              data-i18n="copyLink"
+            >
               Copy link
             </button>
           </div>
@@ -214,19 +251,39 @@ const starterTools = starterIds.map((id) => {
           {tool?.description}
         </p>
         <noscript>
-          <p>Enable JavaScript to run these tools locally in your browser.</p>
+          <p data-i18n="enableJs">
+            Enable JavaScript to run these tools locally in your browser.
+          </p>
         </noscript>
         <form id="tool-form" hidden>
           <div class="field-header">
-            <label for="input">Input</label>
+            <label for="input" data-i18n="input">
+              Input
+            </label>
             <div>
-              <button type="button" id="example" class="link-button">
+              <button
+                type="button"
+                id="example"
+                class="link-button"
+                data-i18n="loadExample"
+              >
                 Load example
               </button>
-              <button type="button" id="undo-clear" class="link-button" hidden>
+              <button
+                type="button"
+                id="undo-clear"
+                class="link-button"
+                hidden
+                data-i18n="restoreText"
+              >
                 Restore text
               </button>
-              <button type="button" id="clear" class="link-button">
+              <button
+                type="button"
+                id="clear"
+                class="link-button"
+                data-i18n="clear"
+              >
                 Clear
               </button>
             </div>
@@ -242,19 +299,24 @@ const starterTools = starterIds.map((id) => {
           <p
             id="input-summary"
             title="Recent text inputs are kept in this tab while you switch tools. Reloading clears them."
+            data-i18n-title="inputSummaryTitle"
             class="input-summary muted mono"
           ></p>
           <div id="file-field" hidden>
-            <label for="file">Choose file (maximum 32 MB)</label>
+            <label for="file" data-i18n="chooseFile32">
+              Choose file (maximum 32 MB)
+            </label>
             <input id="file" type="file" />
           </div>
           <div id="animation-options" hidden>
-            <p class="muted">
+            <p class="muted" data-i18n="framesHelp">
               Frames fit the first image’s canvas. Adjust the order and duration
               (milliseconds) below.
             </p>
             <div id="frames"></div>
-            <label for="animation-loops">Loop count (0 = forever)</label>
+            <label for="animation-loops" data-i18n="loopCount">
+              Loop count (0 = forever)
+            </label>
             <input
               id="animation-loops"
               type="number"
@@ -263,7 +325,7 @@ const starterTools = starterIds.map((id) => {
               value="0"
             />
             <div id="fallback-options" hidden>
-              <label for="fallback-file">
+              <label for="fallback-file" data-i18n="fallbackImage">
                 Static fallback image (optional)
               </label>
               <input
@@ -271,9 +333,11 @@ const starterTools = starterIds.map((id) => {
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
               />
-              <label for="fallback-color">Fallback background</label>
+              <label for="fallback-color" data-i18n="fallbackBackground">
+                Fallback background
+              </label>
               <input id="fallback-color" type="color" value="#ffffff" />
-              <p class="muted">
+              <p class="muted" data-i18n="fallbackHelp">
                 APNG viewers show the main image; static PNG viewers show the
                 fallback. Both images are readable from the file. Image
                 optimization or conversion may remove this behavior.
@@ -281,11 +345,16 @@ const starterTools = starterIds.map((id) => {
             </div>
           </div>
           <div id="option-field" hidden>
-            <label for="option" id="option-label">
+            <label for="option" id="option-label" data-i18n="options">
               Options
             </label>
             <textarea id="option" rows="2" spellcheck="false"></textarea>
-            <select id="unit-select" hidden aria-label="Input unit"></select>
+            <select
+              id="unit-select"
+              hidden
+              aria-label="Input unit"
+              data-i18n-aria="inputUnit"
+            ></select>
           </div>
           <div id="suite-controls" hidden></div>
           <label
@@ -294,15 +363,19 @@ const starterTools = starterIds.map((id) => {
             for="bypass-limits"
           >
             <input id="bypass-limits" type="checkbox" />
-            Bypass size, quantity, and time limits
+            <span data-i18n="bypassLimits">
+              Bypass size, quantity, and time limits
+            </span>
           </label>
-          <p id="bypass-limits-help" class="muted">
+          <p id="bypass-limits-help" class="muted" data-i18n="bypassHelp">
             May use large amounts of memory and freeze this tab. Stop still
             works where a Stop button is shown.
           </p>
           <div class="actions">
             <button id="run" class="primary" disabled>
-              <span id="run-label">Run tool</span>{" "}
+              <span id="run-label" data-i18n="runTool">
+                Run tool
+              </span>{" "}
               <span aria-hidden="true">→</span>
             </button>
             <span class="muted">Ctrl / ⌘ + Enter</span>
@@ -310,25 +383,32 @@ const starterTools = starterIds.map((id) => {
         </form>
         <p id="error" role="alert" tabindex="-1" hidden></p>
         <div class="field-header">
-          <label for="output">Result</label>
+          <label for="output" data-i18n="result">
+            Result
+          </label>
           <div>
-            <button id="copy" class="link-button" disabled>
+            <button id="copy" class="link-button" disabled data-i18n="copy">
               Copy
             </button>
-            <button id="download" class="link-button" disabled>
+            <button
+              id="download"
+              class="link-button"
+              disabled
+              data-i18n="download"
+            >
               Download
             </button>
           </div>
         </div>
         <div id="empty-result" class="empty-result">
-          <p>Your result will appear here.</p>
-          <span class="muted">
+          <p data-i18n="emptyResult">Your result will appear here.</p>
+          <span class="muted" data-i18n="emptyHint">
             Choose your input and options, then run the tool.
           </span>
         </div>
         <div id="output-format-controls" class="output-format-controls"></div>
         <div id="result-view" class="result-view" hidden></div>
-        <button id="toggle-raw" class="link-button" hidden>
+        <button id="toggle-raw" class="link-button" hidden data-i18n="showRaw">
           Show raw output
         </button>
         <textarea
@@ -338,7 +418,9 @@ const starterTools = starterIds.map((id) => {
           readonly
           spellcheck="false"
           aria-label="Result"
+          data-i18n-aria="result"
           placeholder="Your result will appear here."
+          data-i18n-placeholder="emptyResult"
         ></textarea>
         <p class="muted result-meta" id="result-status" role="status">
           All calculations run locally. No account required.
@@ -353,6 +435,9 @@ const starterTools = starterIds.map((id) => {
         <span aria-hidden="true">/</span>
         <a href="https://geoip.l5z12.dev">GeoIP</a>
         <span aria-hidden="true">/</span>
+        <button id="language" class="link-button" type="button">
+          Language: Browser
+        </button>
         <button id="theme" class="link-button">
           Theme: Auto
         </button>

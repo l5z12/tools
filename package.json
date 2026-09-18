@@ -46,6 +46,7 @@
     "test:hashes": "bun scripts/check-hashes.ts",
     "test:images": "bun scripts/check-images.ts",
     "test:interface": "bun scripts/check-user-interface.ts",
+    "test:i18n": "bun scripts/check-i18n.ts",
     "test:media": "bun scripts/check-media.ts",
     "test:native": "cargo test --locked --manifest-path core/Cargo.toml",
     "test:output-formats": "bun scripts/check-output-formats.ts",

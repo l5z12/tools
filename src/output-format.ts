@@ -2,6 +2,7 @@
 import { suiteCore } from "./workbench-core";
 import { decodeHex, decodeBase64 } from "./byte-input";
 import type { SuiteResult } from "./workbench-types";
+import { t } from "./i18n";
 
 export const outputModes = [
   "Original",
@@ -73,44 +74,43 @@ export function outputSource(
   if (ciphertext)
     return {
       bytes: decodeBase64(ciphertext.base64),
-      description:
-        "Ciphertext bytes. Original retains the encryption envelope and its nonce/IV.",
+      description: t("ciphertextBytes"),
     };
   const binary = result?.files?.find((file) => file.name === "result.bin");
   if (binary)
     return {
       bytes: decodeBase64(binary.base64),
-      description: "Exact result bytes.",
+      description: t("exactBytes"),
     };
   if (result?.formatBytes !== undefined)
     return {
       bytes: decodeBase64(result.formatBytes),
       description:
-        id === "hash-workbench" ? "Digest bytes." : "Encoded payload bytes.",
+        id === "hash-workbench" ? t("digestBytes") : t("encodedBytes"),
     };
   if (digestTools.has(id))
-    return { bytes: decodeHex(original), description: "Result bytes." };
+    return { bytes: decodeHex(original), description: t("resultBytes") };
   if (base64Tools.has(id))
     return {
       bytes: decodeBase64(original),
-      description: "Encoded payload bytes.",
+      description: t("encodedBytes"),
     };
   if (id === "hmac-calc" || id === "sri-generator") {
     const data = result?.data as
       { hex?: string; integrity?: string } | undefined;
     if (data?.hex)
-      return { bytes: decodeHex(data.hex), description: "Digest bytes." };
+      return { bytes: decodeHex(data.hex), description: t("digestBytes") };
     if (data?.integrity)
       return {
         bytes: decodeBase64(
           data.integrity.slice(data.integrity.indexOf("-") + 1),
         ),
-        description: "Digest bytes.",
+        description: t("digestBytes"),
       };
   }
   return {
     bytes: new TextEncoder().encode(original),
-    description: "UTF-8 bytes of the result text.",
+    description: t("utf8Bytes"),
   };
 }
 

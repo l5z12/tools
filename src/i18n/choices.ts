@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+import { currentLocale } from "./locale";
+
+const choicesZh: Record<string, string> = {
+  Encrypt: "加密",
+  Decrypt: "解密",
+  Encode: "编码",
+  Decode: "解码",
+  Script: "脚本",
+  "Interactive REPL": "交互式 REPL",
+  "Interactive terminal": "交互式终端",
+  "Prefilled input": "预填输入",
+  create: "创建",
+  inspect: "查看",
+  test: "测试",
+  extract: "解压",
+  repack: "重新打包",
+  compress: "压缩",
+  decompress: "解压",
+  balanced: "均衡",
+  fast: "快速",
+  maximum: "最大",
+  store: "仅存储",
+  Original: "Original",
+  Lowercase: "小写",
+  Uppercase: "大写",
+  None: "无",
+  Spaces: "空格",
+  Hyphens: "连字符",
+  Colons: "冒号",
+  Commas: "逗号",
+  Newlines: "换行",
+  Padded: "填充",
+  Unpadded: "不填充",
+  Envelope: "信封",
+  Ascending: "升序",
+  Descending: "降序",
+  "Current page": "当前页",
+  "All matching rows": "全部匹配行",
+  Integrity: "完整性",
+  "Foreign keys": "外键",
+  Both: "全部",
+  Cryptographic: "密码学",
+  "Extendable output": "可扩展输出",
+  Legacy: "遗留",
+  Compatibility: "兼容",
+  Checksum: "校验和",
+  Noncryptographic: "非密码学",
+  Forever: "无限",
+};
+
+export function choiceLabel(value: string): string {
+  if (currentLocale() !== "zh") return value;
+  return choicesZh[value] ?? value;
+}

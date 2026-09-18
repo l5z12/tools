@@ -9,6 +9,7 @@ import {
   type OutputMode,
 } from "./output-format";
 import type { SuiteResult } from "./workbench-types";
+import { choiceLabel, t } from "./i18n";
 
 type RenderOutput = (text: string, formatted: boolean) => void;
 let formatted = false;
@@ -37,7 +38,7 @@ function selectControl(
   for (const value of choices) {
     const option = document.createElement("option");
     option.value = value;
-    option.textContent = value;
+    option.textContent = choiceLabel(value);
     select.append(option);
   }
   select.value = initial;
@@ -58,7 +59,7 @@ export function configureOutputFormat(
 
   const mode = selectControl(
     root,
-    "Output format",
+    t("outputFormat"),
     "mode",
     outputModes,
     "Original",
@@ -67,35 +68,35 @@ export function configureOutputFormat(
   hexOptions.className = "output-format-options";
   const letterCase = selectControl(
     hexOptions,
-    "Hex letter case",
+    t("hexLetterCase"),
     "case",
     ["Lowercase", "Uppercase"],
     "Lowercase",
   );
   const separator = selectControl(
     hexOptions,
-    "Between groups",
+    t("betweenGroups"),
     "separator",
     ["None", "Spaces", "Hyphens", "Colons", "Commas", "Newlines"],
     "None",
   );
   const groupBytes = selectControl(
     hexOptions,
-    "Bytes per group",
+    t("bytesPerGroup"),
     "group",
     ["1", "2", "4", "8", "16"],
     "1",
   );
   const prefix = selectControl(
     hexOptions,
-    "Group prefix",
+    t("groupPrefix"),
     "prefix",
     ["None", "0x", "\\x"],
     "None",
   );
   const lineBytes = selectControl(
     hexOptions,
-    "Bytes per line",
+    t("bytesPerLine"),
     "line",
     ["0", "8", "16", "32", "64"],
     "0",
@@ -105,14 +106,14 @@ export function configureOutputFormat(
   base64Options.className = "output-format-options";
   const padding = selectControl(
     base64Options,
-    "Base64 padding",
+    t("base64Padding"),
     "padding",
     ["Padded", "Unpadded"],
     "Padded",
   );
   const wrap = selectControl(
     base64Options,
-    "Base64 characters per line",
+    t("base64Wrap"),
     "wrap",
     ["0", "64", "76"],
     "0",
@@ -161,11 +162,11 @@ export function configureOutputFormat(
       };
       formatted = false;
       render(original, false);
-      note.textContent = "Formatting…";
+      note.textContent = t("formatting");
       const text = await formatOutput(source.bytes, options);
       if (ticket !== revision) return;
       formatted = true;
-      note.textContent = `${source.description} Copy and Download use this format. Zero line width means no wrapping.`;
+      note.textContent = t("formatNote", { description: source.description });
       render(text, true);
     } catch (error) {
       if (ticket !== revision) return;
@@ -175,7 +176,7 @@ export function configureOutputFormat(
       hexOptions.hidden = true;
       base64Options.hidden = true;
       render(original, false);
-      note.textContent = `${String(error)} Showing Original.`;
+      note.textContent = t("formatError", { error: String(error) });
     }
   };
   root.addEventListener("change", update);

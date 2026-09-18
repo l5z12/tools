@@ -2,6 +2,7 @@
 import type { SuiteOptions, SuiteResult } from "../workbench-types";
 import { updateDatabaseControls } from "./controls";
 import { armTimeout, overLimit } from "../limits";
+import { formatNumber, t } from "../i18n";
 
 let activeCancel: (() => void) | undefined;
 export function cancelSqlite(): void {
@@ -12,11 +13,11 @@ export function configureSqlite(container: HTMLElement): void {
   const status = document.createElement("p");
   status.dataset.sqlStatus = "";
   status.setAttribute("role", "status");
-  status.textContent = "SQLite loads on the first run.";
+  status.textContent = t("sqliteLoading");
   const stop = document.createElement("button");
   stop.type = "button";
   stop.dataset.sqlStop = "";
-  stop.textContent = "Stop SQLite";
+  stop.textContent = t("stopSqlite");
   stop.disabled = true;
   stop.onclick = cancelSqlite;
   container.append(status, stop);
@@ -75,8 +76,11 @@ export async function runSqlite(
             updateDatabaseControls(container, data.result.sqliteBrowser);
             status.textContent =
               data.result.sqliteBrowser.error ??
-              `Database opened · ${data.result.sqliteBrowser.tables.length} tables/views · ${data.result.sqliteBrowser.matchingRows} matching rows.`;
-          } else status.textContent = "Finished.";
+              t("sqliteOpened", {
+                n: formatNumber(data.result.sqliteBrowser.tables.length),
+                rows: formatNumber(data.result.sqliteBrowser.matchingRows),
+              });
+          } else status.textContent = t("sqliteFinished");
           resolve(data.result);
         }
       };

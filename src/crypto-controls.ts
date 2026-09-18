@@ -3,6 +3,7 @@ import { modernSpecs, codecIds } from "./lib/codec-tools";
 import { randomHex } from "./crypto-runtime";
 import { suiteCore } from "./workbench-core";
 import type { SuiteResult } from "./workbench-types";
+import { t } from "./i18n";
 const input = (key: string) =>
   document.getElementById("suite-" + key) as
     HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
@@ -21,7 +22,7 @@ export function configureCrypto(
   const spec = modernSpecs.find((s) => "crypto-" + s[0] === id);
   if (spec) {
     container.append(
-      button("Generate random key", () => {
+      button(t("generateRandomKey"), () => {
         input("key").value = randomHex(spec[2]);
         onChange();
       }),
@@ -37,7 +38,7 @@ export function configureCrypto(
   }
   if (id === "crypto-pbkdf2" || id === "crypto-hkdf")
     container.append(
-      button("Generate random salt", () => {
+      button(t("generateRandomSalt"), () => {
         input("salt").value = randomHex(16);
         onChange();
       }),
@@ -46,9 +47,9 @@ export function configureCrypto(
     const status = document.createElement("p");
     status.setAttribute("role", "status");
     const keys = document.createElement("div");
-    const generate = button("Generate RSA key pair", async () => {
+    const generate = button(t("generateRsa"), async () => {
       generate.disabled = true;
-      status.textContent = "Generating keys…";
+      status.textContent = t("generatingKeys");
       keys.replaceChildren();
       try {
         const result = await suiteCore(
@@ -60,24 +61,28 @@ export function configureCrypto(
         if (!container.contains(generate)) return;
         const pair = result.data as { publicKey: string; privateKey: string };
         for (const [label, key] of [
-          ["Public key", pair.publicKey],
-          ["Private key", pair.privateKey],
+          [t("publicKey"), pair.publicKey],
+          [t("privateKey"), pair.privateKey],
         ]) {
           const details = document.createElement("details");
           const summary = document.createElement("summary");
           summary.textContent = label;
           const pre = document.createElement("pre");
           pre.textContent = key;
-          const use = button("Use " + label.toLowerCase(), () => {
-            input("key").value = key;
-            input("mode").value =
-              label === "Public key" ? "Encrypt" : "Decrypt";
-            onChange();
-          });
+          const use = button(
+            label === t("publicKey") ? t("usePublicKey") : t("usePrivateKey"),
+            () => {
+              input("key").value = key;
+              input("mode").value =
+                label === t("publicKey") ? "Encrypt" : "Decrypt";
+              onChange();
+            },
+          );
           const download = document.createElement("a");
-          download.textContent = "Save " + label.toLowerCase();
+          download.textContent =
+            label === t("publicKey") ? t("savePublicKey") : t("savePrivateKey");
           download.download =
-            label === "Public key" ? "public.pem" : "private.pem";
+            label === t("publicKey") ? "public.pem" : "private.pem";
           download.href = "data:application/x-pem-file;base64," + btoa(key);
           details.append(
             summary,
@@ -91,8 +96,7 @@ export function configureCrypto(
         input("key").value = pair.publicKey;
         input("mode").value = "Encrypt";
         onChange();
-        status.textContent =
-          "Key pair ready. Public key selected for encryption. Keep the private key to decrypt.";
+        status.textContent = t("keyPairReady");
       } catch (e) {
         status.textContent = String(e);
       } finally {
@@ -111,8 +115,7 @@ export function renderCodecActions(
   if (!codecIds.has(id) || result.kind !== "code" || !result.text) return;
   if (new TextEncoder().encode(result.text).length > 2_000_000) {
     const note = document.createElement("p");
-    note.textContent =
-      "This result exceeds the text input limit. Save the result and choose it as a file to decode or decrypt.";
+    note.textContent = t("resultTooLarge");
     container.append(note);
     return;
   }
@@ -125,10 +128,10 @@ export function renderCodecActions(
     return;
   const transfer = button(
     encrypt
-      ? "Use ciphertext for decryption"
+      ? t("useCiphertext")
       : encode
-        ? "Use encoded result for decoding"
-        : "Use result as input",
+        ? t("useEncoded")
+        : t("useResultAsInput"),
     () => {
       (document.getElementById("input") as HTMLTextAreaElement).value =
         result.text!;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { SuiteOptions, SuiteResult } from "../workbench-types";
 import { armTimeout, overLimit } from "../limits";
+import { t } from "../i18n";
 
 let activeCancel: (() => void) | undefined;
 export function cancelCpp(): void {
@@ -11,11 +12,11 @@ export function configureCpp(container: HTMLElement): void {
   const status = document.createElement("p");
   status.dataset.cppStatus = "";
   status.setAttribute("role", "status");
-  status.textContent = "C/C++ loads on the first run.";
+  status.textContent = t("cppLoading");
   const stop = document.createElement("button");
   stop.type = "button";
   stop.dataset.cppStop = "";
-  stop.textContent = "Stop C/C++";
+  stop.textContent = t("stopCpp");
   stop.disabled = true;
   stop.onclick = cancelCpp;
   container.append(status, stop);

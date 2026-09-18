@@ -3,6 +3,7 @@ import { decodeRaster, encodeRaster, resizeRaster } from "./raster-client";
 import { imageCore } from "./image-core";
 import type { ImageArtifact } from "./image-tools";
 import { overLimit, formBypassLimits } from "./limits";
+import { t } from "./i18n";
 
 interface Frame {
   file: File;
@@ -28,7 +29,7 @@ function list() {
     row.className = "frame-row";
     const img = document.createElement("img");
     img.src = frame.url;
-    img.alt = `Frame ${index + 1}`;
+    img.alt = t("frameAlt", { n: index + 1 });
     const label = document.createElement("span");
     label.textContent = `${index + 1}. ${frame.file.name}`;
     const delay = document.createElement("input");
@@ -36,10 +37,7 @@ function list() {
     delay.min = "10";
     delay.max = "65535";
     delay.value = String(frame.delay);
-    delay.setAttribute(
-      "aria-label",
-      `Frame ${index + 1} duration in milliseconds`,
-    );
+    delay.setAttribute("aria-label", t("frameDuration", { n: index + 1 }));
     delay.oninput = () => {
       frame.delay = Number(delay.value);
       changed();
@@ -54,7 +52,7 @@ function list() {
       button.textContent = caption;
       button.setAttribute(
         "aria-label",
-        `Move frame ${index + 1} ${shift < 0 ? "up" : "down"}`,
+        t(shift < 0 ? "moveFrameUp" : "moveFrameDown", { n: index + 1 }),
       );
       button.disabled = index + shift < 0 || index + shift >= frames.length;
       button.onclick = () => {
@@ -69,7 +67,7 @@ function list() {
     }
     const remove = document.createElement("button");
     remove.type = "button";
-    remove.textContent = "Remove";
+    remove.textContent = t("remove");
     remove.onclick = () => {
       URL.revokeObjectURL(frame.url);
       frames.splice(index, 1);

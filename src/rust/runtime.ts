@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { SuiteOptions, SuiteResult } from "../workbench-types";
 import { armTimeout, overLimit } from "../limits";
+import { t } from "../i18n";
 let activeCancel: (() => void) | undefined;
 export function cancelRust(): void {
   activeCancel?.();
@@ -9,11 +10,11 @@ export function configureRust(container: HTMLElement): void {
   const status = document.createElement("p");
   status.dataset.rustStatus = "";
   status.setAttribute("role", "status");
-  status.textContent = "Rust loads on the first run.";
+  status.textContent = t("rustLoading");
   const stop = document.createElement("button");
   stop.type = "button";
   stop.dataset.rustStop = "";
-  stop.textContent = "Stop Rust";
+  stop.textContent = t("stopRust");
   stop.disabled = true;
   stop.onclick = cancelRust;
   container.append(status, stop);
