@@ -54,7 +54,7 @@ encoding_rs = "0.8"
 zip = { version = "8.6.0", default-features = false, features = ["aes-crypto", "deflate", "deflate-flate2-zlib-rs", "deflate64", "lzma"] }
 tar = "0.4"
 flate2 = {version = "1", default-features = false, features = ["rust_backend"]}
-brotli = "8"
+brotli = "9"
 ruzstd = "0.8"
 data-encoding = "2"
 bs58 = "0.5"
