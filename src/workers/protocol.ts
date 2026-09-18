@@ -8,7 +8,12 @@ export interface SuiteRequest {
   options: SuiteOptions;
 }
 
-type Pixels = { width: number; height: number; pixels: Uint8Array };
+type Pixels = {
+  width: number;
+  height: number;
+  pixels: Uint8Array;
+  bypassLimits?: boolean;
+};
 export type ImageRequest = Pixels &
   (
     | { kind: "decode" }

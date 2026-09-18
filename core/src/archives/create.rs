@@ -27,9 +27,7 @@ fn sevenz_methods(level: u32, password: &str) -> Vec<EncoderConfiguration> {
 pub fn encode(files: &[ArchiveFile], options: &Value) -> Result<Vec<u8>, String> {
     let format = option(options, "format", "zip");
     let password = option(options, "outputPassword", "");
-    if password.len() > 1024 {
-        return Err("Password exceeds 1024 bytes.".into());
-    }
+    crate::limits::check(password.len(), 1024, "Password exceeds 1024 bytes.")?;
     if !password.is_empty() && !["zip", "7z", "rar"].contains(&format) {
         return Err("Password encryption requires ZIP or 7z or RAR.".into());
     }
@@ -133,9 +131,7 @@ pub fn encode(files: &[ArchiveFile], options: &Value) -> Result<Vec<u8>, String>
         }
         _ => return Err("Choose ZIP, RAR, TAR, TAR.GZ or 7z.".into()),
     };
-    if output.len() > LIMIT {
-        return Err("Archive output exceeds 64 MiB.".into());
-    }
+    crate::limits::check(output.len(), LIMIT, "Archive output exceeds 64 MiB.")?;
     Ok(output)
 }
 
@@ -181,7 +177,7 @@ struct LimitedArchiveOutput(Vec<u8>);
 
 impl Write for LimitedArchiveOutput {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        if bytes.len() > LIMIT.saturating_sub(self.0.len()) {
+        if crate::limits::over(bytes.len(), LIMIT.saturating_sub(self.0.len())) {
             return Err(std::io::Error::other("Archive output exceeds 64 MiB."));
         }
         self.0.extend_from_slice(bytes);

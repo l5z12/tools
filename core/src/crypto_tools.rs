@@ -213,11 +213,11 @@ pub fn execute(id: &str, input: &str, source: &[u8], opts: &Value) -> Result<Val
     if iv.len() != nonce_length {
         return Err(format!("Nonce / IV must be exactly {nonce_length} bytes."));
     }
-    if bytes.len() > 8 * 1024 * 1024 + if decrypt { 16 } else { 0 } {
-        return Err(
-            "Payload is limited to 8 MiB, plus padding or authentication tag on decryption.".into(),
-        );
-    }
+    crate::limits::check(
+        bytes.len(),
+        8 * 1024 * 1024 + if decrypt { 16 } else { 0 },
+        "Payload is limited to 8 MiB, plus padding or authentication tag on decryption.",
+    )?;
     if !authenticated && !aad.is_empty() {
         return Err("AAD is supported only by authenticated encryption modes.".into());
     }

@@ -3,6 +3,7 @@ import { decodeBase64, decodeHex } from "./byte-input";
 import { hashAlgorithms } from "./lib/hash-tools";
 import { suiteCore } from "./workbench-core";
 import type { SuiteOptions, SuiteResult } from "./workbench-types";
+import { armTimeout, overLimit } from "./limits";
 
 export function hashWorkerCount(count: number, cores: number): number {
   const available = Number.isFinite(cores) ? Math.floor(cores) : 2;
@@ -82,7 +83,7 @@ export async function hashSuite(
       algorithms: names,
     });
   const source = inputBytes(input, bytes, options);
-  if (source.length > 1024 * 1024)
+  if (overLimit(source.length, 1024 * 1024, options))
     throw Error(
       "Multiple-hash calculation is limited to 1 MiB; choose a single algorithm for larger files.",
     );
@@ -106,12 +107,13 @@ export async function hashSuite(
         reject(error);
       }
     };
-    const timeout = setTimeout(
+    const timeout = armTimeout(
       () =>
         fail(
           Error("Hash calculation exceeded 60 seconds. Try a smaller input."),
         ),
       60000,
+      options,
     );
     try {
       for (const algorithms of batches) {

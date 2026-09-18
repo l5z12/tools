@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 pub fn demangle(input: &str) -> Result<Value, String> {
     let mut rows = Vec::new();
     for symbol in input.lines().map(str::trim).filter(|line| !line.is_empty()) {
-        if rows.len() >= 2000 || symbol.len() > 8192 {
+        if crate::limits::at_least(rows.len(), 2000) || crate::limits::over(symbol.len(), 8192) {
             return Err("Limit: 2,000 symbols, 8 KiB each.".into());
         }
         let msvc = symbol.starts_with('?');
@@ -79,7 +79,7 @@ pub fn diagnostics(input: &str) -> Result<Value, String> {
             })
         };
         if let Some(row) = matched {
-            if rows.len() >= 10000 {
+            if crate::limits::at_least(rows.len(), 10000) {
                 return Err("Limit: 10,000 diagnostics.".into());
             }
             rows.push(row);

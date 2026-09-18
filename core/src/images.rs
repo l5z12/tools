@@ -2,7 +2,12 @@
 use wasm_bindgen::prelude::*;
 
 fn size(w: u32, h: u32) -> Result<usize, String> {
-    if w == 0 || h == 0 || w > 8192 || h > 8192 || u64::from(w) * u64::from(h) > 8_388_608 {
+    if w == 0
+        || h == 0
+        || crate::limits::over(w as usize, 8192)
+        || crate::limits::over(h as usize, 8192)
+        || (!crate::limits::enabled() && u64::from(w) * u64::from(h) > 8_388_608)
+    {
         return Err("Use images up to 8 megapixels and 8192 pixels per side.".into());
     }
     Ok(w as usize * h as usize * 4)

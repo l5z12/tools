@@ -72,9 +72,12 @@ fn fingerprintjs(input: &str) -> String {
 
 #[wasm_bindgen]
 pub fn fingerprint_hash(kind: &str, input: &str) -> Result<String, JsValue> {
-    if input.len() > 16 * 1024 * 1024 {
-        return Err(JsValue::from_str("Fingerprint input exceeds 16 MiB."));
-    }
+    crate::limits::check(
+        input.len(),
+        16 * 1024 * 1024,
+        "Fingerprint input exceeds 16 MiB.",
+    )
+    .map_err(|e| JsValue::from_str(&e))?;
     match kind {
         "fingerprintjs-3.4.2" => Ok(fingerprintjs(input)),
         "creep-mini" => {

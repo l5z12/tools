@@ -40,10 +40,12 @@ export function runWorkerTask<Request, Result>(
       worker.onerror = () => finish({ error: task.failureMessage });
       worker.onmessageerror = () =>
         finish({ error: "The worker returned an unreadable result." });
-      timer = setTimeout(
-        () => finish({ error: task.timeoutMessage }),
-        task.timeoutMs,
-      );
+      if (task.timeoutMs > 0) {
+        timer = setTimeout(
+          () => finish({ error: task.timeoutMessage }),
+          task.timeoutMs,
+        );
+      }
       worker.postMessage(task.request);
     } catch (error) {
       finish({ error: error instanceof Error ? error.message : String(error) });

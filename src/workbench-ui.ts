@@ -27,6 +27,7 @@ import { configureCrypto } from "./crypto-controls";
 import { imageSuite } from "./workbench-images";
 import { prepareBinaryComparison } from "./utility-ui";
 import type { SuiteOptions, SuiteResult } from "./workbench-types";
+import { formBypassLimits, overLimit } from "./limits";
 import { configureReference, queryReference, referenceIds } from "./references";
 import { clearWorkbenchView, renderWorkbenchView } from "./workbench-view";
 import { element } from "./ui/dom";
@@ -224,7 +225,10 @@ export async function executeSuite(
   input: string,
 ): Promise<SuiteResult> {
   const tool = workbenchTools.find((t) => t.id === id)!;
-  const options: SuiteOptions = { now: Math.floor(Date.now() / 1000) };
+  const options: SuiteOptions = {
+    now: Math.floor(Date.now() / 1000),
+    bypassLimits: formBypassLimits(),
+  };
   if (id === "everyday-calendar")
     options.uid = crypto.randomUUID() + "@tools.l5z12.dev";
   root()
@@ -282,7 +286,7 @@ export async function executeSuite(
     );
   if (tool.inputMode === "images") return imageSuite(id, files, options);
   if (id === "util-binary-diff") {
-    const comparison = await prepareBinaryComparison(files);
+    const comparison = await prepareBinaryComparison(files, options);
     return suiteCore(id, "", comparison.bytes, {
       ...options,
       ...comparison.options,
@@ -291,7 +295,8 @@ export async function executeSuite(
   if (tool.inputMode === "file" && !files.length)
     throw Error("Choose a file first.");
   const f = files[0];
-  if (f && f.size > 32 * 1024 * 1024) throw Error("File exceeds 32 MiB.");
+  if (f && overLimit(f.size, 32 * 1024 * 1024, options))
+    throw Error("File exceeds 32 MiB.");
   options.fileProvided = !!f;
   options.filename = f?.name;
   const bytes = f ? new Uint8Array(await f.arrayBuffer()) : new Uint8Array();

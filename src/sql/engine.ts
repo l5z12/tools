@@ -3,6 +3,7 @@ import type { BindParams, SqlJsStatic } from "sql.js";
 import type { SuiteOptions, SuiteResult } from "../workbench-types";
 import { collect, type SqlResultSet } from "./query";
 import { inspectDatabase } from "./inspector";
+import { bypassLimits, overLimit } from "../limits";
 export type { SqlResultSet } from "./query";
 
 function parameters(source: unknown): BindParams {
@@ -37,11 +38,11 @@ export function runSqlite(
   options: SuiteOptions,
 ): SuiteResult {
   if (
-    source.length > 2_000_000 ||
-    String(options.setup ?? "").length > 2_000_000
+    overLimit(source.length, 2_000_000, options) ||
+    overLimit(String(options.setup ?? "").length, 2_000_000, options)
   )
     throw Error("SQL is limited to 2 MiB.");
-  if (bytes && bytes.byteLength > 32 * 1024 * 1024)
+  if (overLimit(bytes?.byteLength ?? 0, 32 * 1024 * 1024, options))
     throw Error("Choose a database up to 32 MiB.");
   if ((id === "sql-schema" || id === "sql-integrity") && !bytes)
     throw Error("Choose a SQLite database file.");
@@ -54,7 +55,7 @@ export function runSqlite(
   const db = new SQL.Database(bytes);
   try {
     db.run(
-      "PRAGMA trusted_schema=OFF; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=0; PRAGMA hard_heap_limit=67108864;",
+      `PRAGMA trusted_schema=OFF; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=0; PRAGMA hard_heap_limit=${bypassLimits(options) ? 0 : 67108864};`,
     );
     let sets: SqlResultSet[];
     if (id === "sql-schema")
@@ -63,10 +64,20 @@ export function runSqlite(
     switch (id) {
       case "sql-runner":
         if (!source.trim()) throw Error("Enter SQL to run.");
-        sets = collect(db, source, bound);
+        sets = collect(db, source, bound, {
+          rows: 0,
+          size: 0,
+          statements: 0,
+          bypassLimits: options.bypassLimits === true,
+        });
         break;
       case "sql-explain": {
-        collect(db, String(options.setup ?? ""));
+        collect(db, String(options.setup ?? ""), null, {
+          rows: 0,
+          size: 0,
+          statements: 0,
+          bypassLimits: options.bypassLimits === true,
+        });
         // Preparing through SQLite verifies one statement without executing it.
         const statements: string[] = [];
         for (const statement of db.iterateStatements(source)) {
@@ -80,6 +91,12 @@ export function runSqlite(
           db,
           `${options.mode === "Virtual machine" ? "EXPLAIN" : "EXPLAIN QUERY PLAN"} ${statements[0]}`,
           bound,
+          {
+            rows: 0,
+            size: 0,
+            statements: 0,
+            bypassLimits: options.bypassLimits === true,
+          },
         );
         break;
       }
@@ -87,6 +104,13 @@ export function runSqlite(
         sets = collect(
           db,
           `PRAGMA ${options.mode === "Quick" ? "quick_check" : "integrity_check"}; PRAGMA foreign_key_check;`,
+          null,
+          {
+            rows: 0,
+            size: 0,
+            statements: 0,
+            bypassLimits: options.bypassLimits === true,
+          },
         );
         break;
       default:
@@ -122,7 +146,7 @@ export function runSqlite(
         db.run("PRAGMA user_version = 0");
         database = new Uint8Array(db.export());
       }
-      if (database.byteLength > 64 * 1024 * 1024)
+      if (overLimit(database.byteLength, 64 * 1024 * 1024, options))
         throw Error("The updated database exceeds 64 MiB.");
       result.mediaFiles = [
         {

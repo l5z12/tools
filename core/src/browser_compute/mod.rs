@@ -20,7 +20,7 @@ pub fn execute(id: &str, input: &str, bytes: &[u8], opts: &Value) -> Result<Valu
                 .trim()
                 .parse()
                 .map_err(|_| "Enter a positive whole number.")?;
-            if count == 0 || count > if id == "uuid" { 100 } else { 256 } {
+            if count == 0 || crate::limits::over(count, if id == "uuid" { 100 } else { 256 }) {
                 return Err("Requested count exceeds the tool limit.".into());
             }
             let mut random = vec![0; if id == "uuid" { count * 16 } else { count }];

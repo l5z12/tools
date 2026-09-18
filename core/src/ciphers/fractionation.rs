@@ -8,9 +8,11 @@ use serde_json::Value;
 
 fn column_order(keyword: &str) -> Result<Vec<usize>, String> {
     let letters = key(keyword)?;
-    if letters.len() > 1000 {
-        return Err("Transposition keyword is limited to 1000 letters.".into());
-    }
+    crate::limits::check(
+        letters.len(),
+        1000,
+        "Transposition keyword is limited to 1000 letters.",
+    )?;
     let mut columns: Vec<_> = (0..letters.len()).collect();
     columns.sort_by_key(|&index| letters[index]);
     Ok(columns)

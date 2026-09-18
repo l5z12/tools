@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { fetchRuntimeAsset } from "./runtime-assets";
-import init from "./generated/l5z12_tools";
+import init, { set_bypass_limits } from "./generated/l5z12_tools";
 
 import { runImageRequest } from "./raster-engine";
 
@@ -13,8 +13,13 @@ const ready = init({
 self.onmessage = async ({ data }: MessageEvent<ImageRequest>) => {
   try {
     await ready;
-    const result = await runImageRequest(data);
-    self.postMessage({ result }, { transfer: [result.buffer] });
+    set_bypass_limits(!!data.bypassLimits);
+    try {
+      const result = await runImageRequest(data);
+      self.postMessage({ result }, { transfer: [result.buffer] });
+    } finally {
+      set_bypass_limits(false);
+    }
   } catch (error) {
     self.postMessage({ error: String(error) });
   }

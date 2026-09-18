@@ -137,9 +137,7 @@ pub(super) fn shift(input: &str, options: &Value) -> Result<Value, String> {
         last_end = last_end.max(shifted_end);
         blocks.push(lines.join("\n"));
         count += 1;
-        if count > 10_000 {
-            return Err("Subtitles are limited to 10,000 cues.".into());
-        }
+        crate::limits::check(count, 10_000, "Subtitles are limited to 10,000 cues.")?;
     }
     if count == 0 {
         return Err("No subtitle cues found.".into());

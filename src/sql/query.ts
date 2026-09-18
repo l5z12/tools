@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { BindParams, Database, Statement } from "sql.js";
+import { overLimit } from "../limits";
 
 export type SqlResultSet = {
   title?: string;
@@ -32,22 +33,30 @@ function cell(value: ReturnType<ExactStatement["get"]>[number]): unknown {
   return value;
 }
 
+type CollectBudget = {
+  rows: number;
+  size: number;
+  statements: number;
+  bypassLimits?: boolean;
+};
+
 /** Iterate to preserve duplicate column names and cap work without materializing an unbounded result. */
 export function collect(
   db: Database,
   sql: string,
   params: BindParams = null,
-  budget = { rows: 0, size: 0, statements: 0 },
+  budget: CollectBudget = { rows: 0, size: 0, statements: 0 },
 ): SqlResultSet[] {
   const sets: SqlResultSet[] = [];
+  const limits = { bypassLimits: budget.bypassLimits };
   for (const statement of db.iterateStatements(sql)) {
-    if (++budget.statements > 1000)
+    if (overLimit(++budget.statements, 1000, limits))
       throw Error("SQL exceeds 1,000 statements.");
     statement.bind(params);
     const columns = statement.getColumnNames();
     const values: unknown[][] = [];
     while (statement.step()) {
-      if (++budget.rows > 5000)
+      if (overLimit(++budget.rows, 5000, limits))
         throw Error(
           "Results exceed 5,000 rows. Add a LIMIT or narrow the query.",
         );
@@ -55,7 +64,7 @@ export function collect(
         .get(null, { useBigInt: true })
         .map(cell);
       budget.size += JSON.stringify(row).length;
-      if (budget.size > 4 * 1024 * 1024)
+      if (overLimit(budget.size, 4 * 1024 * 1024, limits))
         throw Error("Results exceed 4 MiB. Select fewer or smaller values.");
       values.push(row);
     }

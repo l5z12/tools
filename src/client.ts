@@ -30,6 +30,7 @@ import { tools, type Tool } from "./lib/catalog";
 import { renderResult } from "./results";
 import { unitOptions } from "./lib/converters";
 import { processImage, type ImageArtifact } from "./image-tools";
+import { armTimeout, formBypassLimits, overLimit } from "./limits";
 let artifact: ImageArtifact | null = null;
 const fileTool = (id: string) =>
   id === "file-sha256" || id === "hex-viewer" || id.startsWith("image-");
@@ -61,6 +62,19 @@ const drafts = new TextDrafts();
 let clearedText: string | undefined;
 let linkFeedback: ReturnType<typeof setTimeout> | undefined;
 let copyFeedback: ReturnType<typeof setTimeout> | undefined;
+function updateFileLimitLabel(): void {
+  const fileLabel =
+    document.querySelector<HTMLLabelElement>('label[for="file"]');
+  if (!fileLabel || !current) return;
+  if (formBypassLimits()) {
+    fileLabel.textContent = "Choose file";
+    return;
+  }
+  fileLabel.textContent =
+    current.id === "hex-viewer"
+      ? "Choose file (maximum 1 MiB)"
+      : "Choose file (maximum 32 MB)";
+}
 function updateRunState(): void {
   $("run").disabled = !current || !ready || busy;
   $("run-label").textContent = busy ? "Working…" : "Run tool";
@@ -276,13 +290,7 @@ function select(id: string): void {
     ? "image/png,image/jpeg,image/webp,image/gif,image/avif,image/bmp"
     : "";
   $("file").value = "";
-  const fileLabel =
-    document.querySelector<HTMLLabelElement>('label[for="file"]');
-  if (fileLabel)
-    fileLabel.textContent =
-      current.id === "hex-viewer"
-        ? "Choose file (maximum 1 MiB)"
-        : "Choose file (maximum 32 MB)";
+  updateFileLimitLabel();
   configureAnimation(current.id);
   $("input").hidden = fileTool(current.id);
   document.querySelector<HTMLElement>(".field-header")!.hidden = fileTool(
@@ -320,6 +328,7 @@ async function execute() {
   updateRunState();
   $("result-status").textContent = "Working…";
   const ticket = ++request;
+  const limits = { bypassLimits: formBypassLimits() };
   try {
     if (workbenchIds.has(current.id)) {
       const value = await executeSuite(current.id, $("input").value);
@@ -332,7 +341,7 @@ async function execute() {
       return;
     }
     if (current.id === "image-apng" || current.id === "image-fallback-apng") {
-      const image = await processAnimation();
+      const image = await processAnimation(limits.bypassLimits);
       if (ticket === request) {
         artifact = image;
         result(image.text);
@@ -347,6 +356,7 @@ async function execute() {
         current.id,
         $("file").files?.[0],
         $("option").value,
+        limits.bypassLimits,
       );
       if (ticket === request) {
         artifact = image;
@@ -362,7 +372,7 @@ async function execute() {
     if (current.id === "hex-viewer") {
       const file = $("file").files?.[0];
       if (!file) throw Error("Choose a file first.");
-      if (file.size > 1024 * 1024)
+      if (overLimit(file.size, 1024 * 1024, limits))
         throw Error("Hex viewer accepts files up to 1 MiB.");
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (ticket !== request) return;
@@ -380,7 +390,7 @@ async function execute() {
     if (current.id === "file-sha256") {
       const file = $("file").files?.[0];
       if (!file) throw Error("Choose a file first.");
-      if (file.size > 32 * 1024 * 1024)
+      if (overLimit(file.size, 32 * 1024 * 1024, limits))
         throw Error("File exceeds the 32 MB limit.");
       const value = await suiteCore(
         "file-sha256",
@@ -395,13 +405,18 @@ async function execute() {
       id: current.id,
       input: $("input").value,
       option: $("option").value,
+      bypassLimits: limits.bypassLimits,
     });
-    timeout = setTimeout(() => {
-      worker.terminate();
-      ready = false;
-      fail("Processing exceeded 10 seconds. Try a smaller input.");
-      startWorker();
-    }, 10000);
+    timeout = armTimeout(
+      () => {
+        worker.terminate();
+        ready = false;
+        fail("Processing exceeded 10 seconds. Try a smaller input.");
+        startWorker();
+      },
+      10000,
+      limits,
+    );
   } catch (e) {
     if (ticket === request) fail(e instanceof Error ? e.message : String(e));
   }
@@ -453,6 +468,10 @@ $("input").oninput = () => {
   invalidate();
 };
 $("option").oninput = invalidate;
+document.getElementById("bypass-limits")!.onchange = () => {
+  updateFileLimitLabel();
+  invalidate();
+};
 $("file").onchange = () => {
   invalidate();
   loadAnimationFiles();

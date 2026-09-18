@@ -7,6 +7,7 @@ import {
   type PythonRequest,
   type PythonInputReply,
 } from "./protocol";
+import { bypassLimits } from "../limits";
 
 /** Run in a disposable interpreter; never reuse user-modified modules or globals. */
 export async function executePython(
@@ -32,7 +33,9 @@ export async function executePython(
   };
   const append = (chunk: string) => {
     if (truncated) return;
-    const remaining = PYTHON_TEXT_LIMIT - text.length;
+    const remaining = bypassLimits(request.options)
+      ? Number.MAX_SAFE_INTEGER
+      : PYTHON_TEXT_LIMIT - text.length;
     const accepted = chunk.slice(0, remaining);
     text += accepted;
     pending += accepted;

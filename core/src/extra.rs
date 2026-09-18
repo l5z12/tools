@@ -172,9 +172,9 @@ pub fn run(id: &str, s: &str, o: &str) -> Option<Result<String, String>> {
             "line-diff" => {
                 let a = s.lines().collect::<Vec<_>>();
                 let b = o.lines().collect::<Vec<_>>();
-                if a.len() > 10_000
-                    || b.len() > 10_000
-                    || a.len().saturating_mul(b.len()) > 1_000_000
+                if crate::limits::over(a.len(), 10_000)
+                    || crate::limits::over(b.len(), 10_000)
+                    || crate::limits::over(a.len().saturating_mul(b.len()), 1_000_000)
                 {
                     return Err("Comparison is limited to one million line pairs.".into());
                 }

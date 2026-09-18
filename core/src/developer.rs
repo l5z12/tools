@@ -275,7 +275,7 @@ pub fn run(id: &str, s: &str, o: &str) -> Option<Result<String, String>> {
                 let bytes = base64::engine::general_purpose::STANDARD
                     .decode(s.trim())
                     .map_err(|e| e.to_string())?;
-                let rows=bytes.chunks(16).take(4096).enumerate().map(|(i,b)|json!({"offset":format!("{:08X}",i*16),"hex":b.iter().map(|n|format!("{n:02X}")).collect::<Vec<_>>().join(" "),"ascii":b.iter().map(|n|if (32..=126).contains(n){*n as char}else{'.'}).collect::<String>()})).collect::<Vec<_>>();
+                let rows=bytes.chunks(16).take(crate::limits::cap(4096)).enumerate().map(|(i,b)|json!({"offset":format!("{:08X}",i*16),"hex":b.iter().map(|n|format!("{n:02X}")).collect::<Vec<_>>().join(" "),"ascii":b.iter().map(|n|if (32..=126).contains(n){*n as char}else{'.'}).collect::<String>()})).collect::<Vec<_>>();
                 json!({"bytes":bytes.len(),"shownBytes":bytes.len().min(65536),"rows":rows})
                     .to_string()
             }

@@ -443,6 +443,21 @@ assert.match(
 );
 assert.match(run("password", "64").text!, /^[A-Za-z0-9_-]{64}$/);
 assert.throws(() => run("password", "257"));
+assert.throws(
+  () => run("util-clean-urls", "https://example.com\n".repeat(1001)),
+  /1,000/,
+);
+assert.equal(
+  run(
+    "util-clean-urls",
+    "https://example.com\n".repeat(1001),
+    new Uint8Array(),
+    {
+      bypassLimits: true,
+    },
+  ).rows?.length,
+  1001,
+);
 assert.equal(
   run("file-sha256", "", payload).text,
   createHash("sha256").update(payload).digest("hex"),

@@ -6,9 +6,7 @@ use crate::workbench::{code, option};
 use serde_json::Value;
 
 pub fn execute(id: &str, bytes: &[u8], options: &Value) -> Result<Value, String> {
-    if bytes.len() > 2 * 1024 * 1024 {
-        return Err("Input is limited to 2 MiB.".into());
-    }
+    crate::limits::check(bytes.len(), 2 * 1024 * 1024, "Input is limited to 2 MiB.")?;
     if id == "cpp-byte-array" {
         return byte_array(bytes, options);
     }
@@ -23,9 +21,11 @@ pub fn execute(id: &str, bytes: &[u8], options: &Value) -> Result<Value, String>
 }
 
 fn byte_array(bytes: &[u8], options: &Value) -> Result<Value, String> {
-    if bytes.len() > 64 * 1024 {
-        return Err("Choose up to 64 KiB for a source array.".into());
-    }
+    crate::limits::check(
+        bytes.len(),
+        64 * 1024,
+        "Choose up to 64 KiB for a source array.",
+    )?;
     let name = option(options, "name", "payload");
     let identifier = regex::Regex::new(r"^[A-Za-z][A-Za-z0-9_]{0,63}$").unwrap();
     const KEYWORDS: &[&str] = &[

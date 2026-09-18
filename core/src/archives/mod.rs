@@ -51,19 +51,17 @@ pub fn safe_path(name: &str) -> bool {
 pub fn bounded(reader: &mut dyn Read, remaining: usize) -> Result<Vec<u8>, String> {
     let mut bytes = Vec::new();
     reader
-        .take((remaining + 1) as u64)
+        .take(crate::limits::cap(remaining).saturating_add(1) as u64)
         .read_to_end(&mut bytes)
         .map_err(|e| e.to_string())?;
-    if bytes.len() > remaining {
-        return Err("Expanded archive exceeds 64 MiB.".into());
-    }
+    crate::limits::check(bytes.len(), remaining, "Expanded archive exceeds 64 MiB.")?;
     Ok(bytes)
 }
 pub fn create(bytes: &[u8], options: &Value) -> Result<Value, String> {
     let manifest = options["entries"]
         .as_array()
         .ok_or("Choose files to archive.")?;
-    if manifest.is_empty() || manifest.len() > ENTRY_LIMIT {
+    if manifest.is_empty() || crate::limits::over(manifest.len(), ENTRY_LIMIT) {
         return Err("Choose 1–500 files.".into());
     }
     let mut offset = 0usize;

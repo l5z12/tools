@@ -8,6 +8,7 @@ import {
 } from "@bjorn3/browser_wasi_shim";
 import { CapturedOutput, legacyImports, readCppSysroot } from "./wasi";
 import type { SuiteResult } from "../workbench-types";
+import { overLimit } from "../limits";
 
 export type CppRequest = {
   source: string;
@@ -15,6 +16,7 @@ export type CppRequest = {
   optimization: string;
   stdin: string;
   mode: "run" | "compile" | "check" | "preprocess" | "assembly";
+  bypassLimits?: boolean;
 };
 export type CppAssets = {
   clang: WebAssembly.Module;
@@ -36,8 +38,8 @@ export async function compileCpp(
   if (!["0", "1", "2", "3", "s", "z"].includes(request.optimization))
     throw Error("Unsupported optimization level.");
   if (
-    encoder.encode(request.source).length > 1024 * 1024 ||
-    encoder.encode(request.stdin).length > 1024 * 1024
+    overLimit(encoder.encode(request.source).length, 1024 * 1024, request) ||
+    overLimit(encoder.encode(request.stdin).length, 1024 * 1024, request)
   )
     throw Error("Source and stdin are limited to 1 MiB each.");
   const root = readCppSysroot(assets.sysroot);
@@ -47,8 +49,12 @@ export async function compileCpp(
   );
   root.set("work", work);
   root.set("tmp", new Directory(new Map()));
-  const diagnostics = new CapturedOutput();
-  const compilerOutput = new CapturedOutput(1024 * 1024);
+  const diagnostics = new CapturedOutput(
+    request.bypassLimits ? Number.MAX_SAFE_INTEGER : 256 * 1024,
+  );
+  const compilerOutput = new CapturedOutput(
+    request.bypassLimits ? Number.MAX_SAFE_INTEGER : 1024 * 1024,
+  );
   const args = [
     "clang",
     "-cc1",

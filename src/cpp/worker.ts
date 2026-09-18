@@ -3,6 +3,7 @@ import { fetchRuntimeAsset } from "../runtime-assets";
 import initFormat, { format } from "@wasm-fmt/clang-format/web";
 import { compileCpp, type CppRequest } from "./engine";
 import type { SuiteOptions, SuiteResult } from "../workbench-types";
+import { overLimit } from "../limits";
 
 async function asset(name: string): Promise<ArrayBuffer> {
   const response = await fetchRuntimeAsset(
@@ -26,7 +27,7 @@ self.onmessage = async ({
         options.style === "Custom"
           ? String(options.customStyle ?? "")
           : String(options.style ?? "LLVM");
-      if (!style.trim() || style.length > 65536)
+      if (!style.trim() || overLimit(style.length, 65536, options))
         throw Error("Enter a formatting style up to 64 KiB.");
       result = {
         kind: "code",
@@ -59,6 +60,7 @@ self.onmessage = async ({
           standard: String(options.standard ?? "c++17"),
           optimization: String(options.optimization ?? "0"),
           stdin: String(options.stdin ?? ""),
+          bypassLimits: options.bypassLimits === true,
           mode:
             modes[data.id] ??
             (options.action === "Compile only" ? "compile" : "run"),

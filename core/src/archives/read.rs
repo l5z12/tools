@@ -20,14 +20,14 @@ struct Inspection<'a> {
 }
 impl Inspection<'_> {
     fn record(&mut self, name: &str, size: u64, regular: bool) -> Result<bool, String> {
-        if self.rows.len() >= ENTRY_LIMIT {
+        if crate::limits::at_least(self.rows.len(), ENTRY_LIMIT) {
             return Err("Archive exceeds 500 entries.".into());
         }
         self.declared = self
             .declared
             .checked_add(size)
             .ok_or("Invalid archive sizes.")?;
-        if self.declared > LIMIT as u64 {
+        if !crate::limits::enabled() && self.declared > LIMIT as u64 {
             return Err("Declared archive expansion exceeds 64 MiB.".into());
         }
         let safe = regular && claim_path(&mut self.names, name);
@@ -67,9 +67,7 @@ pub fn explore(bytes: &[u8], options: &Value) -> Result<Value, String> {
         return Err("Unknown archive operation.".into());
     }
     let password = option(options, "password", "");
-    if password.len() > 1024 {
-        return Err("Password exceeds 1024 bytes.".into());
-    }
+    crate::limits::check(password.len(), 1024, "Password exceeds 1024 bytes.")?;
     let selected: HashSet<String> = options["selected"]
         .as_array()
         .map(|a| {
@@ -95,7 +93,7 @@ pub fn explore(bytes: &[u8], options: &Value) -> Result<Value, String> {
     } else if bytes.starts_with(b"PK") {
         format = "zip";
         let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| e.to_string())?;
-        if archive.len() > ENTRY_LIMIT {
+        if crate::limits::over(archive.len(), ENTRY_LIMIT) {
             return Err("Archive exceeds 500 entries.".into());
         }
         for index in 0..archive.len() {
@@ -129,7 +127,7 @@ pub fn explore(bytes: &[u8], options: &Value) -> Result<Value, String> {
         let mut archive = sevenz_rust2::ArchiveReader::new(Cursor::new(bytes), password.into())
             .map_err(|e| e.to_string())?;
         archive.set_thread_count(1);
-        if archive.archive().files.len() > ENTRY_LIMIT {
+        if crate::limits::over(archive.archive().files.len(), ENTRY_LIMIT) {
             return Err("Archive exceeds 500 entries.".into());
         }
         let declared = archive
@@ -138,7 +136,7 @@ pub fn explore(bytes: &[u8], options: &Value) -> Result<Value, String> {
             .iter()
             .try_fold(0u64, |sum, f| sum.checked_add(f.size))
             .ok_or("Invalid archive sizes.")?;
-        if declared > LIMIT as u64 {
+        if !crate::limits::enabled() && declared > LIMIT as u64 {
             return Err("Declared archive expansion exceeds 64 MiB.".into());
         }
         let regular = |entry: &sevenz_rust2::ArchiveEntry| {

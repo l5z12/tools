@@ -288,6 +288,18 @@ const starterTools = starterIds.map((id) => {
             <select id="unit-select" hidden aria-label="Input unit"></select>
           </div>
           <div id="suite-controls" hidden></div>
+          <label
+            class="suite-checkbox"
+            id="bypass-limits-field"
+            for="bypass-limits"
+          >
+            <input id="bypass-limits" type="checkbox" />
+            Bypass size, quantity, and time limits
+          </label>
+          <p id="bypass-limits-help" class="muted">
+            May use large amounts of memory and freeze this tab. Stop still
+            works where a Stop button is shown.
+          </p>
           <div class="actions">
             <button id="run" class="primary" disabled>
               <span id="run-label">Run tool</span>{" "}

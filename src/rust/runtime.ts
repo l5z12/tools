@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { SuiteOptions, SuiteResult } from "../workbench-types";
+import { armTimeout, overLimit } from "../limits";
 let activeCancel: (() => void) | undefined;
 export function cancelRust(): void {
   activeCancel?.();
@@ -25,7 +26,7 @@ export async function runRust(
   container: HTMLElement,
 ): Promise<SuiteResult> {
   cancelRust();
-  if (file && file.size > 1024 * 1024)
+  if (file && overLimit(file.size, 1024 * 1024, options))
     throw Error("Choose a Rust file up to 1 MiB.");
   const status = container.querySelector<HTMLElement>("[data-rust-status]")!;
   const stop = container.querySelector<HTMLButtonElement>("[data-rust-stop]")!;
@@ -43,8 +44,12 @@ export async function runRust(
     const source = file ? await Promise.race([file.text(), stopped]) : input;
     if (!source.trim()) throw Error("Enter Rust code first.");
     if (
-      new TextEncoder().encode(source).length > 1024 * 1024 ||
-      String(options.stdin ?? "").length > 1024 * 1024
+      overLimit(
+        new TextEncoder().encode(source).length,
+        1024 * 1024,
+        options,
+      ) ||
+      overLimit(String(options.stdin ?? "").length, 1024 * 1024, options)
     )
       throw Error("Rust source and input are limited to 1 MiB each.");
     // A blob bootstrap inherits the page CSP even on hosts without worker headers.
@@ -66,17 +71,19 @@ export async function runRust(
       worker!.onerror = (event) =>
         reject(Error(event.message || "Rust worker failed."));
     });
-    timer = setTimeout(
+    timer = armTimeout(
       () =>
         rejectStop(
           Error("Rust exceeded the 120-second limit. The worker was stopped."),
         ),
       120_000,
+      options,
     );
     worker.postMessage({
       source,
       edition: String(options.edition ?? "2024"),
       stdin: String(options.stdin ?? ""),
+      bypassLimits: options.bypassLimits === true,
       mode:
         id === "rust-check"
           ? "check"

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { bypassLimits } from "./limits";
 import type { ImageRequest } from "./workers/protocol";
 import { runWorkerTask } from "./workers/task";
 
@@ -12,7 +13,7 @@ export function imageCore(
         type: "module",
       }),
     request,
-    timeoutMs: 60_000,
+    timeoutMs: bypassLimits(request) ? 0 : 60_000,
     timeoutMessage:
       "Image processing exceeded 60 seconds. Use fewer or smaller images.",
     failureMessage: "Image worker failed.",

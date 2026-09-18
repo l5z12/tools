@@ -27,10 +27,23 @@ pub fn suite_run(id: &str, input: &str, bytes: &[u8], options: &str) -> Result<S
         .map_err(|e| JsValue::from_str(&e))
 }
 pub fn execute(id: &str, input: &str, bytes: &[u8], options: &str) -> Result<Value, String> {
-    if bytes.len() > 32 * 1024 * 1024 || input.len() > 2_000_000 || options.len() > 2_000_000 {
-        return Err("Input exceeds this tool's size limit.".into());
-    }
     let opts: Value = serde_json::from_str(options).map_err(|e| e.to_string())?;
+    crate::limits::from_options(&opts);
+    crate::limits::check(
+        bytes.len(),
+        32 * 1024 * 1024,
+        "Input exceeds this tool's size limit.",
+    )?;
+    crate::limits::check(
+        input.len(),
+        2_000_000,
+        "Input exceeds this tool's size limit.",
+    )?;
+    crate::limits::check(
+        options.len(),
+        2_000_000,
+        "Input exceeds this tool's size limit.",
+    )?;
     let source = if opts["fileProvided"] == true {
         bytes
     } else {
@@ -588,9 +601,7 @@ fn csv_work(input: &str, opts: &Value) -> Result<Value, String> {
             }
         }
         rows.push(r);
-        if rows.len() > 100_000 {
-            return Err("CSV is limited to 100,000 rows.".into());
-        }
+        crate::limits::check(rows.len(), 100_000, "CSV is limited to 100,000 rows.")?;
     }
     let sort = option(opts, "sortColumn", "");
     if !sort.is_empty() {

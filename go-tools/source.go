@@ -40,7 +40,7 @@ func inspectSource(input []byte, fullAST bool) (result, error) {
 				return false
 			}
 			count++
-			if count > 20000 || len(stack) > 128 {
+			if over(count, 20000) || over(len(stack), 128) {
 				err = fmt.Errorf("AST exceeds 20,000 nodes or 128 levels")
 				return false
 			}
@@ -74,7 +74,7 @@ func inspectSource(input []byte, fullAST bool) (result, error) {
 		return tree(root), err
 	}
 	imports := []map[string]any{}
-	if len(file.Imports) > 10000 {
+	if over(len(file.Imports), 10000) {
 		return result{}, fmt.Errorf("limit: 10,000 imports")
 	}
 	for _, imp := range file.Imports {
@@ -91,14 +91,14 @@ func inspectSource(input []byte, fullAST bool) (result, error) {
 		if err != nil {
 			return
 		}
-		if len(declarations) >= 10000 {
+		if over(len(declarations), 9999) {
 			err = fmt.Errorf("limit: 10,000 declarations")
 			return
 		}
 		var formatted bytes.Buffer
 		_ = format.Node(&formatted, fset, signature)
 		signatureBytes += formatted.Len()
-		if signatureBytes > 2*1024*1024 {
+		if over(signatureBytes, 2*1024*1024) {
 			err = fmt.Errorf("declaration signatures exceed 2 MiB")
 			return
 		}

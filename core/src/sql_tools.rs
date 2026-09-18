@@ -61,7 +61,11 @@ fn literal(value: &Value, dialect: &str) -> Result<String, String> {
 fn inserts(columns: &[String], rows: &[Vec<Value>], options: &Value) -> Result<Value, String> {
     let dialect_name = option(options, "dialect", "sqlite");
     dialect(dialect_name)?;
-    if rows.is_empty() || rows.len() > 10_000 || columns.is_empty() || columns.len() > 256 {
+    if rows.is_empty()
+        || crate::limits::over(rows.len(), 10_000)
+        || columns.is_empty()
+        || crate::limits::over(columns.len(), 256)
+    {
         return Err("Provide 1–10,000 rows and 1–256 columns.".into());
     }
     let table_name = quote_identifier(option(options, "table", "people"), dialect_name)?;
@@ -80,17 +84,21 @@ fn inserts(columns: &[String], rows: &[Vec<Value>], options: &Value) -> Result<V
         output.push_str(&format!(
             "INSERT INTO {table_name} ({columns}) VALUES ({values});\n"
         ));
-        if output.len() > 8 * 1024 * 1024 {
-            return Err("Generated SQL exceeds 8 MiB.".into());
-        }
+        crate::limits::check(
+            output.len(),
+            8 * 1024 * 1024,
+            "Generated SQL exceeds 8 MiB.",
+        )?;
     }
     Ok(code(output, "sql"))
 }
 
 pub fn execute(id: &str, source: &[u8], options: &Value) -> Result<Value, String> {
-    if source.len() > 2_000_000 {
-        return Err("SQL tools accept up to 2 MiB of text.".into());
-    }
+    crate::limits::check(
+        source.len(),
+        2_000_000,
+        "SQL tools accept up to 2 MiB of text.",
+    )?;
     let input = std::str::from_utf8(source).map_err(|_| "Input must be UTF-8.")?;
     let dialect_name = option(options, "dialect", "sqlite");
     let dialect = dialect(dialect_name)?;
@@ -98,7 +106,7 @@ pub fn execute(id: &str, source: &[u8], options: &Value) -> Result<Value, String
         "sql-inspect" | "sql-normalize" => {
             let statements =
                 Parser::parse_sql(dialect.as_ref(), input).map_err(|error| error.to_string())?;
-            if statements.is_empty() || statements.len() > 1000 {
+            if statements.is_empty() || crate::limits::over(statements.len(), 1000) {
                 return Err("Provide 1–1,000 SQL statements.".into());
             }
             let normalized: Vec<_> = statements
@@ -130,9 +138,7 @@ pub fn execute(id: &str, source: &[u8], options: &Value) -> Result<Value, String
             let tokens = Tokenizer::new(dialect.as_ref(), input)
                 .tokenize_with_location()
                 .map_err(|error| error.to_string())?;
-            if tokens.len() > 20_000 {
-                return Err("Input exceeds 20,000 tokens.".into());
-            }
+            crate::limits::check(tokens.len(), 20_000, "Input exceeds 20,000 tokens.")?;
             Ok(table(
                 tokens
                     .iter()
@@ -216,9 +222,7 @@ pub fn execute(id: &str, source: &[u8], options: &Value) -> Result<Value, String
                         })
                         .collect(),
                 );
-                if rows.len() > 10_000 {
-                    return Err("CSV exceeds 10,000 rows.".into());
-                }
+                crate::limits::check(rows.len(), 10_000, "CSV exceeds 10,000 rows.")?;
             }
             inserts(&columns, &rows, options)
         }

@@ -9,9 +9,9 @@ use wasm_bindgen::prelude::*;
 fn check(width: u32, height: u32) -> Result<(), String> {
     if width == 0
         || height == 0
-        || width > 8192
-        || height > 8192
-        || u64::from(width) * u64::from(height) > 32_000_000
+        || crate::limits::over(width as usize, 8192)
+        || crate::limits::over(height as usize, 8192)
+        || (!crate::limits::enabled() && u64::from(width) * u64::from(height) > 32_000_000)
     {
         return Err("Image exceeds 32 megapixels or 8192 pixels per side.".into());
     }
@@ -32,16 +32,16 @@ fn packed(image: RgbaImage) -> Vec<u8> {
 #[wasm_bindgen]
 pub fn decode_raster(bytes: &[u8]) -> Result<Vec<u8>, JsValue> {
     (|| -> Result<Vec<u8>, String> {
-        if bytes.len() > 32 * 1024 * 1024 {
-            return Err("Image exceeds 32 MiB.".into());
-        }
+        crate::limits::check(bytes.len(), 32 * 1024 * 1024, "Image exceeds 32 MiB.")?;
         let mut reader = ImageReader::new(Cursor::new(bytes))
             .with_guessed_format()
             .map_err(|e| e.to_string())?;
         let mut limits = image::Limits::default();
-        limits.max_image_width = Some(8192);
-        limits.max_image_height = Some(8192);
-        limits.max_alloc = Some(192 * 1024 * 1024);
+        if !crate::limits::enabled() {
+            limits.max_image_width = Some(8192);
+            limits.max_image_height = Some(8192);
+            limits.max_alloc = Some(192 * 1024 * 1024);
+        }
         reader.limits(limits);
         let mut decoder = reader.into_decoder().map_err(|e| e.to_string())?;
         let (width, height) = decoder.dimensions();
@@ -152,7 +152,12 @@ pub fn sprite_raster(
 ) -> Result<Vec<u8>, JsValue> {
     (|| -> Result<Vec<u8>, String> {
         let sizes: Vec<[u32; 2]> = serde_json::from_str(descriptor).map_err(|e| e.to_string())?;
-        if sizes.is_empty() || sizes.len() > 64 || columns == 0 || columns > 64 || gap > 256 {
+        if sizes.is_empty()
+            || crate::limits::over(sizes.len(), 64)
+            || columns == 0
+            || crate::limits::over(columns as usize, 64)
+            || crate::limits::over(gap as usize, 256)
+        {
             return Err("Invalid sprite layout.".into());
         }
         for [width, height] in &sizes {
@@ -171,7 +176,7 @@ pub fn sprite_raster(
             .and_then(|v| v.checked_sub(gap))
             .ok_or("Sprite height overflow.")?;
         check(w, h)?;
-        if u64::from(w) * u64::from(h) > 8_388_608 {
+        if !crate::limits::enabled() && u64::from(w) * u64::from(h) > 8_388_608 {
             return Err("Sprite exceeds 8 megapixels.".into());
         }
         let mut canvas = RgbaImage::new(w, h);

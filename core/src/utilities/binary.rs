@@ -127,7 +127,9 @@ pub(super) fn strings(bytes: &[u8], options: &Value) -> Result<Value, String> {
 pub(super) fn compare(bytes: &[u8], options: &Value) -> Result<Value, String> {
     let split = integer(options, "split", 0, bytes.len())?;
     let (before, after) = bytes.split_at(split);
-    if before.len() > 8 * 1024 * 1024 || after.len() > 8 * 1024 * 1024 {
+    if crate::limits::over(before.len(), 8 * 1024 * 1024)
+        || crate::limits::over(after.len(), 8 * 1024 * 1024)
+    {
         return Err("Each file must be at most 8 MiB.".into());
     }
     let mut offset = 0;

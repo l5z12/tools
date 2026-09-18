@@ -57,9 +57,7 @@ pub(super) fn keypair() -> Result<Value, String> {
 pub(super) fn execute(input: &str, opts: &Value) -> Result<Value, String> {
     let decrypt = option(opts, "mode", "Encrypt") == "Decrypt";
     let raw = option(opts, "key", "");
-    if raw.len() > 32768 {
-        return Err("Key exceeds 32 KiB.".into());
-    }
+    crate::limits::check(raw.len(), 32768, "Key exceeds 32 KiB.")?;
     let payload = rsa_payload(input, opts, decrypt)?;
     if decrypt {
         let key = RsaPrivateKey::from_pkcs8_pem(raw).map_err(|e| e.to_string())?;

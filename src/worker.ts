@@ -5,9 +5,10 @@ interface ToolRequest {
   id: string;
   input: string;
   option: string;
+  bypassLimits?: boolean;
 }
 
-import init, { run } from "./generated/l5z12_tools";
+import init, { run, set_bypass_limits } from "./generated/l5z12_tools";
 const ready = init({
   module_or_path: fetchRuntimeAsset("/wasm/l5z12_tools_bg.wasm"),
 }).then(() => {
@@ -19,10 +20,15 @@ ready.catch((error: unknown) => self.postMessage({ fatal: String(error) }));
 self.onmessage = async ({ data }: MessageEvent<ToolRequest>) => {
   try {
     const { run } = await ready;
-    self.postMessage({
-      request: data.request,
-      result: run(data.id, data.input, data.option),
-    });
+    set_bypass_limits(!!data.bypassLimits);
+    try {
+      self.postMessage({
+        request: data.request,
+        result: run(data.id, data.input, data.option),
+      });
+    } finally {
+      set_bypass_limits(false);
+    }
   } catch (error) {
     self.postMessage({ request: data.request, error: String(error) });
   }

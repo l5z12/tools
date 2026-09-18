@@ -15,16 +15,20 @@ export type RustRequest = {
   mode: "run" | "compile" | "check";
   edition: string;
   stdin: string;
+  bypassLimits?: boolean;
 };
 const textLimit = 128 * 1024;
 class Output extends Fd {
   text = "";
   private decoder = new TextDecoder();
+  constructor(private limit = textLimit) {
+    super();
+  }
   fd_write(bytes: Uint8Array) {
-    if (this.text.length < textLimit)
+    if (this.text.length < this.limit)
       this.text = (
         this.text + this.decoder.decode(bytes, { stream: true })
-      ).slice(0, textLimit);
+      ).slice(0, this.limit);
     return { ret: 0, nwritten: bytes.length };
   }
 }
@@ -89,7 +93,8 @@ export async function compileRust(
       ? "Checking Rust types and borrows…"
       : "Compiling Rust to WebAssembly…",
   );
-  const log = new Output();
+  const cap = request.bypassLimits ? Number.MAX_SAFE_INTEGER : textLimit;
+  const log = new Output(cap);
   const work = new PreopenDirectory(
     "/work",
     new Map([["main.rs", new File(new TextEncoder().encode(request.source))]]),
@@ -164,8 +169,8 @@ export async function compileRust(
   };
   if (request.mode === "compile") return result;
   status("Running compiled Rust…");
-  const output = new Output();
-  const errors = new Output();
+  const output = new Output(cap);
+  const errors = new Output(cap);
   const runtime = new WASI(
     ["program"],
     [],

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { imageCore } from "./image-core";
 import { decodeRaster, encodeRaster, resizeRaster } from "./raster-client";
+import { overLimit } from "./limits";
 
 export interface ImageArtifact {
   secondaryUrl?: string;
@@ -13,9 +14,11 @@ export async function processImage(
   id: string,
   file: File | undefined,
   option: string,
+  bypass = false,
 ): Promise<ImageArtifact> {
   if (!file) throw Error("Choose an image first.");
-  let image = await decodeRaster(file);
+  const limits = { bypassLimits: bypass };
+  let image = await decodeRaster(file, limits);
   if (id === "image-inspect") {
     const meta = {
       Name: file.name,
@@ -48,6 +51,7 @@ export async function processImage(
     const pixels = await imageCore({
       kind: "transform",
       ...image,
+      ...limits,
       operation: effect,
       args: new Float64Array(args),
     });
@@ -72,7 +76,12 @@ export async function processImage(
       !option.trim() ||
       !Number.isInteger(n) ||
       n < 1 ||
-      n > (id === "image-resize" ? 8192 : 100)
+      n >
+        (id === "image-resize"
+          ? bypass
+            ? Number.MAX_SAFE_INTEGER
+            : 8192
+          : 100)
     )
       throw Error("Enter a valid width or quality.");
     if (id === "image-resize") {
