@@ -1876,7 +1876,7 @@ dependencies = [
 name = "l5z12-tools"
 version = "0.1.0"
 dependencies = [
- "aes 0.8.4",
+ "aes 0.9.3",
  "aes-gcm",
  "base64 0.22.1",
  "blake2",
