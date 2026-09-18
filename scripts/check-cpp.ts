@@ -112,7 +112,15 @@ await initFormat(await Bun.file("public/cpp/clang-format.wasm").arrayBuffer());
 const formatted = format("int main(){return 0;}", "main.cpp", "LLVM");
 assert.match(formatted, /int main\(\) \{ return 0; \}/);
 assert.equal(format(formatted, "main.cpp", "LLVM"), formatted);
-assert.throws(() => format("int x;", "main.cpp", "{NoSuchOption: true}"));
+{
+  const write = process.stderr.write.bind(process.stderr);
+  process.stderr.write = () => true;
+  try {
+    assert.throws(() => format("int x;", "main.cpp", "{NoSuchOption: true}"));
+  } finally {
+    process.stderr.write = write;
+  }
+}
 assert.match(
   format(
     "int main(){\nreturn 0;\n}",
