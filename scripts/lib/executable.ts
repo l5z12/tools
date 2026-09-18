@@ -24,6 +24,10 @@ function findExecutable(
   );
 }
 export const findSevenZip = () =>
-  findExecutable("SEVENZIP", ["7zz", "7z"], ["7-Zip", "7z.exe"]);
+  findExecutable(
+    "SEVENZIP",
+    ["7zz", "/usr/bin/7zz", "7z"],
+    ["7-Zip", "7z.exe"],
+  );
 export const findRar = () =>
   findExecutable("RAR", ["rar"], ["WinRAR", "Rar.exe"]);

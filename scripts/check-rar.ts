@@ -3,7 +3,7 @@ import { findSevenZip, findRar } from "./lib/executable";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import init, { suite_run } from "../public/wasm/l5z12_tools";
 import type { SuiteOptions, SuiteResult } from "../src/workbench-types";
 
@@ -47,6 +47,30 @@ function create(options: SuiteOptions): Buffer {
 }
 function extracted(result: SuiteResult): Buffer[] {
   return result.files!.map((file) => Buffer.from(file.base64, "base64"));
+}
+function extractNative(
+  archive: string,
+  dest: string,
+  archivePassword: string,
+): void {
+  const password = archivePassword ? `-p${archivePassword}` : "-p-";
+  try {
+    // Avoid 7z -so: the runner's 7z SIGSEGVs printing encrypted RAR4 .exe members.
+    execFileSync(sevenzip, ["x", "-y", `-o${dest}`, password, archive], {
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 60_000,
+    });
+  } catch {
+    try {
+      execFileSync(
+        rar,
+        ["x", "-y", "-o+", "-idq", "-c-", password, archive, dest + sep],
+        { stdio: ["ignore", "pipe", "pipe"], timeout: 60_000 },
+      );
+    } catch {
+      // WinRAR exits 3 when a historical archive comment is corrupt.
+    }
+  }
 }
 function checkSamples(bytes: Uint8Array, archivePassword: string): void {
   assert.equal(
@@ -185,23 +209,18 @@ for (const [name, archivePassword] of [
   const result = run(bytes, { mode: "extract", password: archivePassword });
   const rows = inspected.rows!.filter((row) => row.extractable === true);
   assert.equal(result.files!.length, rows.length);
+  const dest = join(
+    workspace,
+    "native",
+    name.replaceAll("/", "-").replace(/\.rar$/i, ""),
+  );
+  await mkdir(dest, { recursive: true });
+  extractNative(path, dest, archivePassword);
+  const resultBytes = extracted(result);
   for (let index = 0; index < rows.length; index++) {
-    const expected = execFileSync(
-      sevenzip,
-      [
-        "x",
-        "-so",
-        "-y",
-        "-spd",
-        archivePassword ? `-p${archivePassword}` : "-p-",
-        path,
-        String(rows[index].name),
-      ],
-      { stdio: ["ignore", "pipe", "pipe"], timeout: 60_000 },
-    );
     assert.deepEqual(
-      extracted(result)[index],
-      expected,
+      resultBytes[index],
+      await readFile(join(dest, rows[index].name)),
       `${name}: ${rows[index].name}`,
     );
   }
