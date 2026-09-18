@@ -84,7 +84,7 @@ fn transform(
         "crypto-des-cbc" => cbc!(des::Des),
         "crypto-3des-cbc" => cbc!(des::TdesEde3),
         "crypto-blowfish-cbc" => cbc!(blowfish::Blowfish),
-        "crypto-twofish-cbc" => cbc!(twofish::Twofish),
+        "crypto-twofish-cbc" => twofish_cbc(key, iv, input, decrypt),
         "crypto-serpent-cbc" => {
             if ![16, 24, 32].contains(&key.len()) {
                 return Err("Serpent key must be 16, 24 or 32 bytes.".into());
@@ -100,6 +100,23 @@ fn transform(
         _ => Err("Unknown encryption algorithm.".into()),
     }
 }
+
+fn twofish_cbc(key: &[u8], iv: &[u8], input: &[u8], decrypt: bool) -> Result<Vec<u8>, String> {
+    use twofish::cipher::{
+        array::Array, block_padding::Pkcs7, consts::U16, BlockModeDecrypt, BlockModeEncrypt,
+        InnerIvInit, KeyInit,
+    };
+    let cipher = twofish::Twofish::new_from_slice(key).map_err(|_| "Invalid key or IV length.")?;
+    let iv = Array::<u8, U16>::try_from(iv).map_err(|_| "Invalid key or IV length.")?;
+    if decrypt {
+        cbc02::Decryptor::inner_iv_init(cipher, &iv)
+            .decrypt_padded_vec::<Pkcs7>(input)
+            .map_err(|_| "Invalid ciphertext length or PKCS#7 padding.".to_string())
+    } else {
+        Ok(cbc02::Encryptor::inner_iv_init(cipher, &iv).encrypt_padded_vec::<Pkcs7>(input))
+    }
+}
+
 fn integer(opts: &Value, key: &str, default: &str, max: usize) -> Result<usize, String> {
     let v = option(opts, key, default)
         .parse::<usize>()
