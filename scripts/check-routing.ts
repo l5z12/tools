@@ -132,7 +132,9 @@ if (process.env.CLOUDFLARE_TEST_URL) {
     new URL(redirect.headers.get("location")!, base).pathname,
     "/json-format/",
   );
-  assert.equal((await fetch(new URL("/not-a-real-tool/", base))).status, 404);
+  const missing = await fetch(new URL("/not-a-real-tool/", base));
+  assert.equal(missing.status, 404);
+  assert.ok((await missing.text()).includes("Page not found"));
 }
 console.log(
   `Routing and SEO passed: ${paths.length} static pages, canonical metadata, crawlable links, sitemap, robots, and not-found handling.`,

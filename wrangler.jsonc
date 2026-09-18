@@ -11,7 +11,7 @@
   },
   "assets": {
     "directory": "work/cloudflare/assets",
-    "not_found_handling": "none",
+    "not_found_handling": "404-page",
     "html_handling": "auto-trailing-slash",
   },
   "routes": [
