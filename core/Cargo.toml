@@ -93,7 +93,7 @@ sevenz-rust2 = { version = "0.22.2", default-features = false, features = ["aes2
 rars = "=0.9.4"
 cpp_demangle = "0.5.1"
 msvc-demangler = "0.11"
-jsonwebtoken = { version = "10.4", default-features = false, features = ["rust_crypto", "use_pem"] }
+jsonwebtoken = { version = "11.0", default-features = false, features = ["rust_crypto", "use_pem"] }
 rsa = { version = "0.9", features = ["sha2", "pem"] }
 rand = { version = "0.8", default-features = false, features = ["std_rng"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
