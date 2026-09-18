@@ -6,12 +6,10 @@ const LIMIT: usize = 64 * 1024 * 1024;
 fn bounded(mut r: impl Read) -> Result<Vec<u8>, String> {
     let mut out = Vec::new();
     r.by_ref()
-        .take((LIMIT + 1) as u64)
+        .take(crate::limits::cap(LIMIT).saturating_add(1) as u64)
         .read_to_end(&mut out)
         .map_err(|e| e.to_string())?;
-    if out.len() > LIMIT {
-        return Err("Expanded output exceeds 64 MiB.".into());
-    }
+    crate::limits::check(out.len(), LIMIT, "Expanded output exceeds 64 MiB.")?;
     Ok(out)
 }
 pub fn execute(id: &str, bytes: &[u8], o: &Value) -> Result<Value, String> {
@@ -160,7 +158,7 @@ fn check_zstd(b: &[u8]) -> Result<(), String> {
     if single {
         window = fcs
     }
-    if window > LIMIT as u64 || fcs > LIMIT as u64 {
+    if !crate::limits::enabled() && (window > LIMIT as u64 || fcs > LIMIT as u64) {
         return Err("Zstd window or output exceeds 64 MiB.".into());
     }
     Ok(())
@@ -225,7 +223,7 @@ fn apng(bytes: &[u8]) -> Result<Value, String> {
                 loops = u32::from_be_bytes(b[4..8].try_into().unwrap());
             }
             b"fcTL" => {
-                if n != 26 || declared.is_none() || frames.len() >= 500 {
+                if n != 26 || declared.is_none() || crate::limits::at_least(frames.len(), 500) {
                     return Err("Invalid or excessive animation frames.".into());
                 }
                 if u32::from_be_bytes(b[..4].try_into().unwrap()) != seq {
@@ -291,7 +289,12 @@ fn apng(bytes: &[u8]) -> Result<Value, String> {
     }
     let cw = u32::from_be_bytes(header[..4].try_into().unwrap());
     let ch = u32::from_be_bytes(header[4..8].try_into().unwrap());
-    if cw == 0 || ch == 0 || cw > 8192 || ch > 8192 || cw as u64 * ch as u64 > 8_388_608 {
+    if cw == 0
+        || ch == 0
+        || crate::limits::over(cw as usize, 8192)
+        || crate::limits::over(ch as usize, 8192)
+        || (!crate::limits::enabled() && cw as u64 * ch as u64 > 8_388_608)
+    {
         return Err("APNG canvas exceeds 8 megapixels or 8192 pixels per side.".into());
     }
     let mut files = vec![file(
@@ -324,9 +327,7 @@ fn apng(bytes: &[u8]) -> Result<Value, String> {
         fh[..4].copy_from_slice(&w.to_be_bytes());
         fh[4..8].copy_from_slice(&h.to_be_bytes());
         output_size += compressed.len() + 1024;
-        if output_size > LIMIT {
-            return Err("Extracted PNGs exceed 64 MiB.".into());
-        }
+        crate::limits::check(output_size, LIMIT, "Extracted PNGs exceed 64 MiB.")?;
         files.push(file(
             &format!("frame-{}.png", i + 1),
             "image/png",

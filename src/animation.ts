@@ -2,6 +2,7 @@
 import { decodeRaster, encodeRaster, resizeRaster } from "./raster-client";
 import { imageCore } from "./image-core";
 import type { ImageArtifact } from "./image-tools";
+import { overLimit, formBypassLimits } from "./limits";
 
 interface Frame {
   file: File;
@@ -93,19 +94,21 @@ export function loadAnimationFiles() {
   if (active !== "image-apng" && active !== "image-fallback-apng") return;
   clearFrames();
   const selected = Array.from(node<HTMLInputElement>("file").files ?? []);
+  const keep = formBypassLimits() ? selected.length : 101;
   frames = selected
-    .slice(0, 101)
+    .slice(0, keep)
     .map((file) => ({ file, delay: 100, url: URL.createObjectURL(file) }));
   list();
 }
-async function bitmap(file: File) {
-  if (file.size > 25 * 1024 * 1024)
+async function bitmap(file: File, bypass = false) {
+  const limits = { bypassLimits: bypass };
+  if (overLimit(file.size, 25 * 1024 * 1024, limits))
     throw Error("Each source image must be at most 25 MB.");
-  const image = await decodeRaster(file);
+  const image = await decodeRaster(file, limits);
   if (
-    image.width > 8192 ||
-    image.height > 8192 ||
-    image.width * image.height > 8_388_608
+    overLimit(image.width, 8192, limits) ||
+    overLimit(image.height, 8192, limits) ||
+    overLimit(image.width * image.height, 8_388_608, limits)
   ) {
     throw Error(
       "Each source image must be at most 8 megapixels and 8192 pixels per side.",
@@ -113,8 +116,9 @@ async function bitmap(file: File) {
   }
   return image;
 }
-export async function processAnimation(): Promise<ImageArtifact> {
-  if (!frames.length || frames.length > 100)
+export async function processAnimation(bypass = false): Promise<ImageArtifact> {
+  const limits = { bypassLimits: bypass };
+  if (overLimit(frames.length, 100, limits) || !frames.length)
     throw Error("Choose 1–100 frames.");
   const snapshot = frames.map((f) => ({ ...f }));
   if (
@@ -130,17 +134,17 @@ export async function processAnimation(): Promise<ImageArtifact> {
   const mode = active;
   const fallbackFile = node<HTMLInputElement>("fallback-file").files?.[0];
   const color = node<HTMLInputElement>("fallback-color").value;
-  const first = await bitmap(snapshot[0].file);
+  const first = await bitmap(snapshot[0].file, bypass);
   const w = first.width,
     h = first.height;
   const size = w * h * 4;
-  if (size * snapshot.length > 128 * 1024 * 1024)
+  if (overLimit(size * snapshot.length, 128 * 1024 * 1024, limits))
     throw Error(
       "Combined decoded frames exceed 128 MB. Reduce image dimensions or frame count.",
     );
   const all = new Uint8Array(size * snapshot.length);
   for (let i = 0; i < snapshot.length; i++) {
-    const source = i === 0 ? first : await bitmap(snapshot[i].file);
+    const source = i === 0 ? first : await bitmap(snapshot[i].file, bypass);
     const frame = await resizeRaster(source, w, h, true);
     all.set(frame.pixels, i * size);
   }
@@ -154,7 +158,7 @@ export async function processAnimation(): Promise<ImageArtifact> {
       255,
     ]);
     const source = fallbackFile
-      ? await bitmap(fallbackFile)
+      ? await bitmap(fallbackFile, bypass)
       : {
           width: 1,
           height: 1,
@@ -174,6 +178,7 @@ export async function processAnimation(): Promise<ImageArtifact> {
     delays: new Uint16Array(snapshot.map((f) => f.delay)),
     loops,
     fallback,
+    ...limits,
   });
   const blob = new Blob([bytes], { type: "image/png" });
   const meta = {

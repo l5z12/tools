@@ -4,6 +4,7 @@ import init, {
   reference_load,
   reference_search,
   reference_decode,
+  set_bypass_limits,
 } from "./generated/l5z12_tools";
 import { referenceDataset, referenceBrowsers } from "./lib/reference-tools";
 import type { SuiteOptions } from "./workbench-types";
@@ -44,15 +45,20 @@ self.onmessage = async ({
     const key = referenceDataset[data.id];
     if (!key) throw Error("Unknown reference tool.");
     await load(key);
-    const result = referenceBrowsers.has(data.id)
-      ? reference_search(
-          key,
-          data.input,
-          String(data.options.family ?? "All"),
-          data.page,
-        )
-      : reference_decode(data.id, data.input, JSON.stringify(data.options));
-    self.postMessage({ request: data.request, result: JSON.parse(result) });
+    set_bypass_limits(data.options.bypassLimits === true);
+    try {
+      const result = referenceBrowsers.has(data.id)
+        ? reference_search(
+            key,
+            data.input,
+            String(data.options.family ?? "All"),
+            data.page,
+          )
+        : reference_decode(data.id, data.input, JSON.stringify(data.options));
+      self.postMessage({ request: data.request, result: JSON.parse(result) });
+    } finally {
+      set_bypass_limits(false);
+    }
   } catch (error) {
     self.postMessage({ request: data.request, error: String(error) });
   }

@@ -2,6 +2,7 @@
 import { referenceBrowsers, referenceIds } from "./lib/reference-tools";
 import type { SuiteOptions, SuiteResult } from "./workbench-types";
 import type { ReferencePage } from "./reference-types";
+import { armTimeout } from "./limits";
 let worker: Worker | undefined;
 let request = 0;
 const pending = new Map<
@@ -9,7 +10,7 @@ const pending = new Map<
   {
     resolve: (r: SuiteResult) => void;
     reject: (e: Error) => void;
-    timer: ReturnType<typeof setTimeout>;
+    timer?: ReturnType<typeof setTimeout>;
   }
 >();
 function start() {
@@ -65,9 +66,10 @@ export function queryReference(
   return new Promise((resolve, reject) => {
     const ticket = ++request;
     const w = start();
-    const timer = setTimeout(
+    const timer = armTimeout(
       () => stop("Reference processing timed out. Try again."),
       30000,
+      options,
     );
     pending.set(ticket, { resolve, reject, timer });
     w.postMessage({ request: ticket, id, input, options, page });

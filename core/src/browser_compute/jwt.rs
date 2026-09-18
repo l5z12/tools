@@ -29,7 +29,7 @@ pub(super) fn verify(input: &str, opts: &Value) -> Result<Value, String> {
         return Err("Unexpected algorithm or unsupported critical JWT header.".into());
     }
     let raw = option(opts, "key", "");
-    if raw.trim().is_empty() || raw.len() > 32768 {
+    if raw.trim().is_empty() || crate::limits::over(raw.len(), 32768) {
         return Err("Provide a verification key up to 32 KiB.".into());
     }
     let key = match option(opts, "keyFormat", "text") {

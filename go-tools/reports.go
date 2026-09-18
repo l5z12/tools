@@ -41,7 +41,7 @@ func inspectTests(input []byte) (result, error) {
 			return result{}, fmt.Errorf("event %d: %w", events+1, err)
 		}
 		events++
-		if events > 30000 {
+		if over(events, 30000) {
 			return result{}, fmt.Errorf("limit: 30,000 test events")
 		}
 		if event.Package == "" && strings.HasPrefix(event.Action, "build-") {
@@ -99,7 +99,7 @@ func inspectCoverage(input []byte) (result, error) {
 	if mode != "mode: set" && mode != "mode: count" && mode != "mode: atomic" {
 		return result{}, fmt.Errorf("expected coverage mode set, count, or atomic")
 	}
-	if len(lines) > 20001 {
+	if over(len(lines), 20001) {
 		return result{}, fmt.Errorf("limit: 20,000 coverage blocks")
 	}
 	// Bound counters before the upstream parser merges duplicate locations.
@@ -180,7 +180,7 @@ func inspectBenchmarks(input string) (result, error) {
 		units := map[string]bool{}
 		for i := 2; i < len(fields); i += 2 {
 			contextBytesTotal += len(context)
-			if contextBytesTotal > 2*1024*1024 {
+			if over(contextBytesTotal, 2*1024*1024) {
 				return result{}, fmt.Errorf("benchmark context output exceeds 2 MiB")
 			}
 			value, err := strconv.ParseFloat(fields[i], 64)
@@ -193,7 +193,7 @@ func inspectBenchmarks(input string) (result, error) {
 			groups[key] = append(groups[key], value)
 			names[key] = [3]string{context, fields[0], unit}
 			rows = append(rows, map[string]any{"benchmark": fields[0], "iterations": strconv.FormatUint(iterations, 10), "value": value, "unit": unit, "context": context})
-			if len(rows) > 20000 {
+			if over(len(rows), 20000) {
 				return result{}, fmt.Errorf("limit: 20,000 benchmark measurements")
 			}
 		}

@@ -47,9 +47,7 @@ impl Outline {
 }
 
 pub fn execute(id: &str, text: &str, options: &Value) -> Result<Value, String> {
-    if text.len() > 256 * 1024 {
-        return Err("Rust source is limited to 256 KiB.".into());
-    }
+    crate::limits::check(text.len(), 256 * 1024, "Rust source is limited to 256 KiB.")?;
     match id {
         "rust-demangle" => {
             let rows = text.lines().filter(|line| !line.trim().is_empty()).map(|line| {

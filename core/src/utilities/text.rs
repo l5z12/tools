@@ -13,7 +13,7 @@ fn unique_lines(
     let mut seen = BTreeSet::new();
     let mut entries = Vec::new();
     for (index, line) in input.lines().enumerate() {
-        if index >= 50_000 {
+        if crate::limits::at_least(index, 50_000) {
             return Err("Lists are limited to 50,000 lines each.".into());
         }
         let spelling = if trim { line.trim() } else { line };
@@ -93,7 +93,7 @@ pub(super) fn log_patterns(input: &str) -> Result<Value, String> {
     let mut patterns: BTreeMap<String, LogPattern> = BTreeMap::new();
     let mut count = 0;
     for (index, line) in input.lines().enumerate() {
-        if index >= 50_000 {
+        if crate::limits::at_least(index, 50_000) {
             return Err("Log analysis is limited to 50,000 lines.".into());
         }
         if line.trim().is_empty() {
@@ -111,9 +111,11 @@ pub(super) fn log_patterns(input: &str) -> Result<Value, String> {
         });
         entry.count += 1;
         entry.last = index + 1;
-        if patterns.len() > 5000 {
-            return Err("Log analysis is limited to 5,000 distinct patterns.".into());
-        }
+        crate::limits::check(
+            patterns.len(),
+            5000,
+            "Log analysis is limited to 5,000 distinct patterns.",
+        )?;
     }
     let mut groups: Vec<_> = patterns.into_iter().collect();
     groups.sort_by(|left, right| {

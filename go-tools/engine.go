@@ -12,8 +12,23 @@ import (
 )
 
 type options struct {
-	Action string `json:"action"`
-	Tags   string `json:"tags"`
+	Action       string `json:"action"`
+	Tags         string `json:"tags"`
+	BypassLimits bool   `json:"bypassLimits"`
+}
+
+var bypassLimits bool
+
+func limitsBypassed(optionsJSON string) bool {
+	var raw struct {
+		BypassLimits bool `json:"bypassLimits"`
+	}
+	_ = json.Unmarshal([]byte(optionsJSON), &raw)
+	return raw.BypassLimits
+}
+
+func over(n, max int) bool {
+	return !bypassLimits && n > max
 }
 
 type result struct {
@@ -29,7 +44,7 @@ func tree(data any) result               { return result{Kind: "data", Data: dat
 func table(rows []map[string]any) result { return result{Kind: "table", Rows: rows} }
 
 func execute(id string, input []byte, opts options) (result, error) {
-	if len(input) > 32*1024*1024 {
+	if over(len(input), 32*1024*1024) {
 		return result{}, fmt.Errorf("choose a file up to 32 MiB")
 	}
 	if id == "go-build-info" {
@@ -39,7 +54,7 @@ func execute(id string, input []byte, opts options) (result, error) {
 		}
 		return tree(info), nil
 	}
-	if len(input) > 2*1024*1024 {
+	if over(len(input), 2*1024*1024) {
 		return result{}, fmt.Errorf("text is limited to 2 MiB")
 	}
 	if !utf8.Valid(input) {
@@ -78,7 +93,8 @@ func runJSON(id string, input []byte, optionsJSON string) (output string) {
 			output = string(encoded)
 		}
 	}()
-	if len(optionsJSON) > 64*1024 {
+	bypassLimits = limitsBypassed(optionsJSON)
+	if over(len(optionsJSON), 64*1024) {
 		return `{"error":"Options are limited to 64 KiB"}`
 	}
 	var opts options

@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { SuiteResult } from "./workbench-types";
+import { overLimit } from "./limits";
 
-export async function prepareBinaryComparison(files: File[]) {
+export async function prepareBinaryComparison(
+  files: File[],
+  options: { bypassLimits?: unknown } = {},
+) {
   if (files.length !== 2) throw Error("Choose exactly two files to compare.");
-  if (files.some((file) => file.size > 8 * 1024 * 1024))
+  if (files.some((file) => overLimit(file.size, 8 * 1024 * 1024, options)))
     throw Error("Each comparison file must be at most 8 MiB.");
   const [before, after] = await Promise.all(
     files.map((file) => file.arrayBuffer()),

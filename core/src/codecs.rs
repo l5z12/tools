@@ -127,9 +127,11 @@ fn radix_convert(input: &[u8], from: u32, to: u32) -> Vec<u8> {
     out
 }
 fn base62(input: &[u8], decode: bool) -> Result<Vec<u8>, String> {
-    if input.len() > if decode { 32_768 } else { 16_384 } {
-        return Err("Base62 supports 16 KiB of bytes or 32 KiB of encoded text.".into());
-    }
+    crate::limits::check(
+        input.len(),
+        if decode { 32_768 } else { 16_384 },
+        "Base62 supports 16 KiB of bytes or 32 KiB of encoded text.",
+    )?;
     if decode {
         let digits: Vec<u8> = input
             .iter()
@@ -383,15 +385,15 @@ fn uu(input: &[u8], decode: bool) -> Result<Vec<u8>, String> {
 }
 pub fn execute(id: &str, input: &[u8], opts: &Value) -> Result<Value, String> {
     let decode = option(opts, "mode", "Encode") == "Decode";
-    if input.len()
-        > if decode {
+    crate::limits::check(
+        input.len(),
+        if decode {
             32 * 1024 * 1024
         } else {
             2 * 1024 * 1024
-        }
-    {
-        return Err("Encode up to 2 MiB of bytes; decode an encoded file up to 32 MiB.".into());
-    }
+        },
+        "Encode up to 2 MiB of bytes; decode an encoded file up to 32 MiB.",
+    )?;
     let variant = option(opts, "variant", "Standard");
     let padded = option(opts, "padding", "Padded") == "Padded";
     let result = match id {
@@ -429,9 +431,11 @@ pub fn execute(id: &str, input: &[u8], opts: &Value) -> Result<Value, String> {
             }
         }
         "codec-base58" => {
-            if input.len() > if decode { 32_768 } else { 16_384 } {
-                return Err("Base58 supports 16 KiB of bytes or 32 KiB of encoded text.".into());
-            }
+            crate::limits::check(
+                input.len(),
+                if decode { 32_768 } else { 16_384 },
+                "Base58 supports 16 KiB of bytes or 32 KiB of encoded text.",
+            )?;
             let alphabet = match variant {
                 "Flickr" => bs58::Alphabet::FLICKR,
                 "Ripple" => bs58::Alphabet::RIPPLE,
@@ -563,9 +567,11 @@ pub fn execute(id: &str, input: &[u8], opts: &Value) -> Result<Value, String> {
         } else {
             2 * 1024 * 1024
         };
-        if result.len() > limit {
-            return Err(format!("Decoded data exceeds {limit} bytes."));
-        }
+        crate::limits::check(
+            result.len(),
+            limit,
+            &format!("Decoded data exceeds {limit} bytes."),
+        )?;
         Ok(bytes_result(&result))
     } else {
         let mut v = code(

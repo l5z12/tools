@@ -67,11 +67,11 @@ fn hex_output(bytes: &[u8], options: &Value, c_array: bool) -> Result<String, St
 }
 
 pub fn execute(bytes: &[u8], options: &Value) -> Result<Value, String> {
-    if bytes.len() > 2 * 1024 * 1024 {
-        return Err(
-            "Output formatting supports up to 2 MiB. Use Original for this larger result.".into(),
-        );
-    }
+    crate::limits::check(
+        bytes.len(),
+        2 * 1024 * 1024,
+        "Output formatting supports up to 2 MiB. Use Original for this larger result.",
+    )?;
     if !(1..=64).contains(&setting(options, "groupBytes", 1)?) {
         return Err("Group size must be 1–64 bytes.".into());
     }

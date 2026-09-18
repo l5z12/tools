@@ -15,7 +15,7 @@ pub(super) fn clean_urls(input: &str, options: &Value) -> Result<Value, String> 
     let mut rows = Vec::new();
     let mut cleaned = Vec::new();
     for line in input.lines().filter(|line| !line.trim().is_empty()) {
-        if rows.len() >= 1000 {
+        if crate::limits::at_least(rows.len(), 1000) {
             return Err("URL cleanup is limited to 1,000 links.".into());
         }
         let original = line.trim();

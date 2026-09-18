@@ -10,9 +10,11 @@ use crate::workbench::{data, option};
 use serde_json::{json, Value};
 
 pub fn execute(id: &str, source: &[u8], options: &Value) -> Result<Value, String> {
-    if source.len() > 8 * 1024 * 1024 {
-        return Err("These inspectors accept up to 8 MiB.".into());
-    }
+    crate::limits::check(
+        source.len(),
+        8 * 1024 * 1024,
+        "These inspectors accept up to 8 MiB.",
+    )?;
     if matches!(
         id,
         "dev-msgpack-inspect" | "dev-cbor-inspect" | "dev-protobuf"

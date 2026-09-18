@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { imageCore } from "./image-core";
+import type { SuiteOptions } from "./workbench-types";
+import { overLimit } from "./limits";
 export type Raster = {
   width: number;
   height: number;
@@ -13,14 +15,19 @@ export function unpackRaster(bytes: Uint8Array<ArrayBuffer>): Raster {
     pixels: bytes.slice(8),
   };
 }
-export async function decodeRaster(file: File): Promise<Raster> {
-  if (file.size > 32 * 1024 * 1024) throw Error("Image exceeds 32 MiB.");
+export async function decodeRaster(
+  file: File,
+  options?: SuiteOptions,
+): Promise<Raster> {
+  if (overLimit(file.size, 32 * 1024 * 1024, options))
+    throw Error("Image exceeds 32 MiB.");
   return unpackRaster(
     await imageCore({
       kind: "decode",
       width: 0,
       height: 0,
       pixels: new Uint8Array(await file.arrayBuffer()),
+      bypassLimits: options?.bypassLimits === true,
     }),
   );
 }

@@ -17,6 +17,14 @@ OUTPUT_LIMIT = 2 * 1024 * 1024
 DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 
 
+def bypass(options):
+    return bool(options.get("bypassLimits"))
+
+
+def over(n, maximum, options):
+    return n > maximum and not bypass(options)
+
+
 def table(rows, **summary):
     return {"kind": "data", "rows": rows, "data": summary or None}
 
@@ -32,9 +40,9 @@ def line_width(options):
     return width
 
 
-def parse_source(source):
+def parse_source(source, options=None):
     tree = ast.parse(source, filename="input.py")
-    if sum(1 for _ in ast.walk(tree)) > NODE_LIMIT:
+    if over(sum(1 for _ in ast.walk(tree)), NODE_LIMIT, options or {}):
         raise ValueError("Source exceeds the 10,000 syntax-node limit.")
     return tree
 
@@ -70,9 +78,9 @@ def ast_value(value, locations=False):
     return value
 
 
-def syntax_check(source):
+def syntax_check(source, options=None):
     try:
-        tree = parse_source(source)
+        tree = parse_source(source, options)
         compile(tree, "input.py", "exec", dont_inherit=True)
         return {"kind": "data", "data": {"valid": True, "python": sys.version.split()[0], "message": "Syntax and compilation checks passed."}}
     except SyntaxError as error:
@@ -122,7 +130,7 @@ def token_rows(source, options):
         rows.append({"type": tokenize.tok_name[token.type], "exactType": tokenize.tok_name[token.exact_type],
                      "text": token.string, "line": token.start[0], "column": token.start[1] + 1,
                      "endLine": token.end[0], "endColumn": token.end[1] + 1})
-        if len(rows) > ROW_LIMIT:
+        if over(len(rows), ROW_LIMIT, options):
             raise ValueError("Token output exceeds 10,000 rows.")
     return table(rows, tokens=len(rows))
 
@@ -209,7 +217,7 @@ def bytecode(tree, options):
         for instruction in dis.get_instructions(block):
             rows.append({"scope": block.co_qualname, "offset": instruction.offset, "line": instruction.positions.lineno,
                          "opcode": instruction.opname, "argument": instruction.argrepr})
-            if len(rows) > ROW_LIMIT:
+            if over(len(rows), ROW_LIMIT, options):
                 raise ValueError("Bytecode output exceeds 10,000 instructions.")
         pending.extend(
             reversed([item for item in block.co_consts if isinstance(item, types.CodeType)]))
@@ -239,18 +247,19 @@ def regex_test(source, options):
     pattern = re.compile(str(options.get("pattern", "")), flags)
     action = options.get("action", "Find matches")
     if action == "Replace":
-        output, count = pattern.subn(str(options.get("replacement", "")), source, count=1000)
-        if len(output.encode("utf-8")) > 1024 * 1024:
+        count = 0 if bypass(options) else 1000
+        output, count = pattern.subn(str(options.get("replacement", "")), source, count=count)
+        if over(len(output.encode("utf-8")), 1024 * 1024, options):
             raise ValueError("Replacement output exceeds 1 MiB.")
-        return {**code_result(output), "data": {"replacements": count, "limit": 1000}}
+        return {**code_result(output), "data": {"replacements": count, "limit": None if bypass(options) else 1000}}
     if action == "Split":
-        return {"kind": "data", "data": pattern.split(source, maxsplit=1000)}
+        return {"kind": "data", "data": pattern.split(source, maxsplit=0 if bypass(options) else 1000)}
     if action != "Find matches":
         raise ValueError("Unknown regex operation.")
     rows = []
     truncated = False
     for match in pattern.finditer(source):
-        if len(rows) == 1000:
+        if len(rows) == 1000 and not bypass(options):
             truncated = True
             break
         rows.append({"match": match.group(), "start": match.start(), "end": match.end(),
@@ -268,10 +277,10 @@ def analyze(operation, source, options):
         json_compatible(value)  # Reject float overflow instead of producing a bare inf name.
         return code_result(pprint.pformat(value, width=line_width(options), sort_dicts=False) + "\n")
     if operation == "python-syntax":
-        return syntax_check(source)
+        return syntax_check(source, options)
     if operation == "python-tokens":
         return token_rows(source, options)
-    tree = parse_source(source.strip() if operation == "python-literal-json" else source)
+    tree = parse_source(source.strip() if operation == "python-literal-json" else source, options)
     if operation == "python-format":
         return format_source(source, tree, options)
     if operation == "python-style":
@@ -299,6 +308,6 @@ def run_request(encoded):
         payload = {key: value for key, value in result.items() if key != "kind"}
         result["text"] = json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False)
     output = json.dumps(result, ensure_ascii=False, allow_nan=False)
-    if len(output.encode("utf-8")) > OUTPUT_LIMIT:
+    if over(len(output.encode("utf-8")), OUTPUT_LIMIT, request["options"]):
         raise ValueError("Analysis output exceeds 2 MiB. Use a smaller input.")
     return output

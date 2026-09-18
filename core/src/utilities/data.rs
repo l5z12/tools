@@ -14,10 +14,10 @@ fn collect_sizes(
     depth: usize,
     rows: &mut Vec<Value>,
 ) -> Result<(), String> {
-    if depth > 64 {
+    if depth > 64 && !crate::limits::enabled() {
         return Err("JSON exceeds the maximum depth of 64.".into());
     }
-    if rows.len() >= 5000 {
+    if crate::limits::at_least(rows.len(), 5000) {
         return Err("JSON exceeds the 5,000-path limit.".into());
     }
     let size = serde_json::to_vec(value)
@@ -80,7 +80,7 @@ fn replace_fields(
     replacement: &str,
     depth: usize,
 ) -> Result<usize, String> {
-    if depth > 64 {
+    if depth > 64 && !crate::limits::enabled() {
         return Err("JSON exceeds the maximum depth of 64.".into());
     }
     let mut count = 0;
@@ -165,14 +165,16 @@ pub(super) fn csv_profile(source: &[u8], options: &Value) -> Result<Value, Strin
         "Semicolon" => b';',
         _ => return Err("Unknown delimiter.".into()),
     };
-    if source.len() > 8 * 1024 * 1024 {
-        return Err("CSV profiling is limited to 8 MiB.".into());
-    }
+    crate::limits::check(
+        source.len(),
+        8 * 1024 * 1024,
+        "CSV profiling is limited to 8 MiB.",
+    )?;
     let mut reader = csv::ReaderBuilder::new()
         .delimiter(delimiter)
         .from_reader(source);
     let headers = reader.headers().map_err(|error| error.to_string())?.clone();
-    if headers.is_empty() || headers.len() > 100 {
+    if headers.is_empty() || crate::limits::over(headers.len(), 100) {
         return Err("CSV needs between 1 and 100 columns.".into());
     }
     let mut columns: Vec<ColumnProfile> = (0..headers.len())
@@ -182,9 +184,11 @@ pub(super) fn csv_profile(source: &[u8], options: &Value) -> Result<Value, Strin
     for record in reader.records() {
         let record = record.map_err(|error| error.to_string())?;
         count += 1;
-        if count > 50_000 {
-            return Err("CSV profiling is limited to 50,000 data rows.".into());
-        }
+        crate::limits::check(
+            count,
+            50_000,
+            "CSV profiling is limited to 50,000 data rows.",
+        )?;
         for (column, value) in columns.iter_mut().zip(record.iter()) {
             column.add(value);
         }

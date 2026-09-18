@@ -2,6 +2,7 @@
 import type { Database } from "sql.js";
 import type { SuiteOptions, SuiteResult } from "../workbench-types";
 import { collect, identifier, type SqlResultSet } from "./query";
+import { bypassLimits, overLimit } from "../limits";
 
 export type DatabaseBrowser = {
   tables: { name: string; type: string }[];
@@ -82,7 +83,12 @@ export function inspectDatabase(
   options: SuiteOptions,
 ): SuiteResult {
   db.run("PRAGMA query_only=ON;");
-  const budget = { rows: 0, size: 0, statements: 0 };
+  const budget = {
+    rows: 0,
+    size: 0,
+    statements: 0,
+    bypassLimits: options.bypassLimits === true,
+  };
   const query = (sql: string) => collect(db, sql, null, budget)[0];
   const schema = query(
     "SELECT type, name, tbl_name, sql FROM sqlite_schema ORDER BY CASE type WHEN 'table' THEN 0 WHEN 'index' THEN 1 WHEN 'view' THEN 2 ELSE 3 END, name;",
@@ -164,7 +170,7 @@ export function inspectDatabase(
       const pageSize = integer(options.pageSize, 100, 500);
       const requestedPage = integer(options.page, 1, 1_000_000);
       const filter = String(options.filter ?? "");
-      if (filter.length > 4096)
+      if (overLimit(filter.length, 4096, options))
         throw Error("Filter text is limited to 4,096 characters.");
       const sort = String(options.sort ?? "");
       if (sort && !browser.columns.includes(sort))
@@ -201,16 +207,25 @@ export function inspectDatabase(
       browser.page = Math.min(requestedPage, browser.pages);
       const offset = (browser.page - 1) * pageSize;
       const fullExport = options.exportScope === "All matching rows";
-      if (fullExport && browser.matchingRows > 5000)
+      if (fullExport && overLimit(browser.matchingRows, 5000, options))
         throw Error(
           "Full export is limited to 5,000 matching rows. Narrow the filter or export a page.",
         );
       const sql = `SELECT ${browser.columns.map(identifier).join(", ")}${from}${where} ORDER BY ${orderBy} LIMIT :limit OFFSET :offset;`;
-      const exported = collect(db, sql, {
-        ...bound,
-        ":limit": fullExport ? 5000 : pageSize,
-        ":offset": fullExport ? 0 : offset,
-      })[0];
+      const exported = collect(
+        db,
+        sql,
+        {
+          ...bound,
+          ":limit": fullExport
+            ? bypassLimits(options)
+              ? browser.matchingRows
+              : 5000
+            : pageSize,
+          ":offset": fullExport ? 0 : offset,
+        },
+        budget,
+      )[0];
       const preview = {
         ...exported,
         values: fullExport

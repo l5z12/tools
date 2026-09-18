@@ -8,6 +8,7 @@ import {
   transform_pixels,
 } from "./generated/l5z12_tools";
 import type { ImageRequest } from "./workers/protocol";
+import { overLimit } from "./limits";
 
 export async function runImageRequest(
   data: ImageRequest,
@@ -26,9 +27,9 @@ export async function runImageRequest(
         const image = await decode(new Uint8Array(data.pixels).buffer);
         if (!image) throw Error("AVIF decoding failed.");
         if (
-          image.width > 8192 ||
-          image.height > 8192 ||
-          image.width * image.height > 32_000_000
+          overLimit(image.width, 8192, data) ||
+          overLimit(image.height, 8192, data) ||
+          overLimit(image.width * image.height, 32_000_000, data)
         )
           throw Error("Image exceeds the pixel limit.");
         const output = new Uint8Array(8 + image.data.length);

@@ -682,6 +682,20 @@ footer .link-button {
   flex: none;
   margin: 0;
 }
+#bypass-limits-field {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+#bypass-limits-field input {
+  width: auto;
+  flex: none;
+  margin: 0;
+}
+#bypass-limits-help {
+  margin-top: 0.35rem;
+}
 #suite-controls input:not([type="checkbox"]),
 #suite-controls select {
   width: 100%;

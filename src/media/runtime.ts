@@ -3,6 +3,7 @@ import { fetchRuntimeAsset } from "../runtime-assets";
 import type { FFmpeg } from "@ffmpeg/ffmpeg";
 import type { SuiteOptions, SuiteResult } from "../workbench-types";
 import { MEDIA_LIMIT, planMedia, type MediaInfo } from "./plan";
+import { armTimeout, overLimit } from "../limits";
 
 type MediaControls = {
   status: HTMLElement;
@@ -85,6 +86,7 @@ async function probe(
   engine: FFmpeg,
   path: string,
   index: number,
+  options: SuiteOptions,
 ): Promise<MediaInfo> {
   const report = `probe-${index}.json`;
   const code = await engine.ffprobe(
@@ -114,10 +116,10 @@ async function probe(
   if (code !== 0 && code !== -1)
     throw Error("FFmpeg could not read this media file.");
   const text = await engine.readFile(report, "utf8");
-  if (typeof text !== "string" || text.length > 1_000_000)
+  if (typeof text !== "string" || overLimit(text.length, 1_000_000, options))
     throw Error("Media metadata exceeds the preview limit.");
   const info: MediaInfo = JSON.parse(text);
-  if (!info.streams?.length || info.streams.length > 32)
+  if (!info.streams?.length || overLimit(info.streams.length, 32, options))
     throw Error("Choose media containing 1–32 readable streams.");
   return info;
 }
@@ -130,9 +132,15 @@ export async function runMedia(
 ): Promise<SuiteResult> {
   files = [...(joinOrders.get(container) ?? files)];
   if (!files.length) throw Error("Choose a media file first.");
-  if (files.length > (id === "audio-join" ? 8 : 1))
+  if (files.length > (id === "audio-join" ? 8 : 1) && !options.bypassLimits)
     throw Error("Too many input files for this tool.");
-  if (files.reduce((sum, f) => sum + f.size, 0) > MEDIA_LIMIT)
+  if (
+    overLimit(
+      files.reduce((sum, f) => sum + f.size, 0),
+      MEDIA_LIMIT,
+      options,
+    )
+  )
     throw Error("Combined input exceeds 64 MiB.");
   cancelMedia();
   const controls: MediaControls = {
@@ -152,7 +160,7 @@ export async function runMedia(
     rejectStop(Error("Processing cancelled."));
   };
   activeCancel = stop;
-  const deadline = setTimeout(
+  const deadline = armTimeout(
     () =>
       rejectStop(
         Error(
@@ -160,6 +168,7 @@ export async function runMedia(
         ),
       ),
     120_000,
+    options,
   );
   const wait = <T>(promise: Promise<T>): Promise<T> =>
     Promise.race([promise, stopped]);
@@ -205,7 +214,7 @@ export async function runMedia(
       await wait(
         engine.writeFile(path, new Uint8Array(await wait(file.arrayBuffer()))),
       );
-      infos.push(await wait(probe(engine, path, index)));
+      infos.push(await wait(probe(engine, path, index, options)));
     }
     if (id === "media-inspect") {
       const data = { file: files[0].name, bytes: files[0].size, ...infos[0] };
@@ -224,7 +233,7 @@ export async function runMedia(
       throw Error("FFmpeg produced no output.");
     // -fs can stop a muxer at its limit with exit status 0. Never offer that
     // incomplete file as a successful conversion.
-    if (output.length >= MEDIA_LIMIT - 65536)
+    if (overLimit(output.length, MEDIA_LIMIT - 65536, options))
       throw Error(
         "Output reached the 64 MiB limit. Choose a shorter clip or a smaller output format.",
       );

@@ -6,6 +6,7 @@ import {
   PYTHON_TEXT_LIMIT,
   type PythonMessage,
 } from "./protocol";
+import { armTimeout, bypassLimits, overLimit } from "../limits";
 
 let activeCancel: (() => void) | undefined;
 let activeTerminal: ReturnType<typeof createTerminal> | undefined;
@@ -100,7 +101,7 @@ export async function runPython(
   operation?: string,
 ): Promise<SuiteResult> {
   const repl = options.mode === "Interactive REPL";
-  if (!repl && file && file.size > PYTHON_SOURCE_LIMIT)
+  if (!repl && file && overLimit(file.size, PYTHON_SOURCE_LIMIT, options))
     throw Error("Choose a Python script up to 1 MiB.");
   // Register cancellation before any asynchronous read, so changing tools cannot
   // start an orphaned interpreter when the old file finishes loading.
@@ -135,12 +136,20 @@ export async function runPython(
     if (!code.trim() && !repl && !operation)
       throw Error("Enter Python code or choose a .py file first.");
     if (
-      new TextEncoder().encode(code).length > PYTHON_SOURCE_LIMIT ||
-      new TextEncoder().encode(stdin).length > PYTHON_SOURCE_LIMIT
+      overLimit(
+        new TextEncoder().encode(code).length,
+        PYTHON_SOURCE_LIMIT,
+        options,
+      ) ||
+      overLimit(
+        new TextEncoder().encode(stdin).length,
+        PYTHON_SOURCE_LIMIT,
+        options,
+      )
     )
       throw Error("Code and standard input must each be at most 1 MiB.");
     const seconds = Number(options.seconds ?? 30);
-    if (![10, 30, 60, 120].includes(seconds))
+    if (!bypassLimits(options) && ![10, 30, 60, 120].includes(seconds))
       throw Error("Choose a valid execution time limit.");
     let remaining = seconds * 1000;
     let runningSince: number | undefined;
@@ -154,7 +163,7 @@ export async function runPython(
     const resumeClock = () => {
       clearTimeout(deadline);
       runningSince = performance.now();
-      deadline = setTimeout(
+      deadline = armTimeout(
         () =>
           rejectStop(
             Error(
@@ -162,6 +171,7 @@ export async function runPython(
             ),
           ),
         Math.max(0, remaining),
+        options,
       );
     };
     console.hidden = interactive || !!operation;
@@ -200,9 +210,10 @@ export async function runPython(
       }),
     );
     worker = new Worker(workerURL, { type: "module" });
-    deadline = setTimeout(
+    deadline = armTimeout(
       () => rejectStop(Error("Python took too long to load. Try again.")),
       120000,
+      options,
     );
     const result = await wait(
       new Promise<SuiteResult>((resolve, reject) => {
@@ -227,7 +238,10 @@ export async function runPython(
           } else if (data.type === "output") {
             terminal?.write(data.text);
             const remaining =
-              PYTHON_TEXT_LIMIT + 17000 - (console.textContent?.length ?? 0);
+              (bypassLimits(options)
+                ? Number.MAX_SAFE_INTEGER
+                : PYTHON_TEXT_LIMIT + 17000) -
+              (console.textContent?.length ?? 0);
             if (remaining > 0)
               console.append(
                 document.createTextNode(data.text.slice(0, remaining)),

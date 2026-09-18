@@ -39,7 +39,7 @@ fn integer(options: &Value, key: &str, default: usize, maximum: usize) -> Result
             .map_err(|_| format!("{key} must be a nonnegative integer."))?,
         None => options[key].as_u64().unwrap_or(default as u64) as usize,
     };
-    if value > maximum {
+    if value > maximum && !crate::limits::enabled() {
         return Err(format!("{key} must be at most {maximum}."));
     }
     Ok(value)

@@ -135,9 +135,11 @@ pub fn reference_search(
         .map_err(err)
 }
 fn search(key: &str, query: &str, family: &str, requested_page: u32) -> Result<Value, String> {
-    if query.len() > 512 {
-        return Err("Reference searches are limited to 512 bytes.".into());
-    }
+    crate::limits::check(
+        query.len(),
+        512,
+        "Reference searches are limited to 512 bytes.",
+    )?;
     DATA.with(|db|{let db=db.borrow();let d=db.get(key).ok_or("Reference dataset has not loaded.")?;let q=query.trim().to_lowercase();let nums=numbers(&q);let words:Vec<_>=q.split_whitespace().collect();let matches:Vec<_>=d.rows.iter().filter(|r|(family=="All"||family.is_empty()||r.family==family)&&if !nums.is_empty(){nums.iter().any(|n|r.value.is_some_and(|v|*n>=v&&*n<=r.end.unwrap_or(v)))}else{words.iter().all(|w|r.search.contains(w))}).collect();let size=50;let current=(requested_page as usize).min(matches.len().saturating_sub(1)/size);let entries:Vec<_>=matches.iter().skip(current*size).take(size).map(|r|r.raw.clone()).collect();Ok(json!({"kind":"reference","text":serde_json::to_string_pretty(&entries).unwrap(),"reference":page(d,entries,matches.len(),current,size)}))})
 }
 fn lookup(d: &Dataset, n: u32, family: &str) -> Vec<Value> {
@@ -160,9 +162,8 @@ pub fn reference_decode(id: &str, input: &str, options: &str) -> Result<String, 
         .map_err(err)
 }
 fn decode(id: &str, input: &str, options: &str) -> Result<Value, String> {
-    if input.len() > 512 || options.len() > 4096 {
-        return Err("Code input exceeds the size limit.".into());
-    }
+    crate::limits::check(input.len(), 512, "Code input exceeds the size limit.")?;
+    crate::limits::check(options.len(), 4096, "Code input exceeds the size limit.")?;
     let o: Value = serde_json::from_str(options).map_err(|e| e.to_string())?;
     DATA.with(|db|{let db=db.borrow();let d=db.get("microsoft").ok_or("Microsoft reference has not loaded.")?;let direction=o["direction"].as_str().unwrap_or("Win32 to HRESULT");let family=match id{"hresult-decode"=>"HRESULT","ntstatus-decode"=>"NTSTATUS","win32-hresult"=>if direction=="HRESULT to Win32"{"HRESULT"}else{"Win32"},_=>return Err("Unknown error decoder.".into())};let symbol=d.rows.iter().find(|r|r.family==family&&r.name.eq_ignore_ascii_case(input.trim())).and_then(|r|r.value);let n=match symbol{Some(n)=>n,None=>parse_code(input,o["base"].as_str().unwrap_or("Auto"))?};let mut data=representation(n);let mut entries=lookup(d,n,family);let mut fields=Vec::new();let mut notes=Vec::new();
 match id{

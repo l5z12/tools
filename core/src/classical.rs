@@ -280,9 +280,7 @@ pub fn execute(id: &str, s: &str, o: &Value) -> Result<Value, String> {
                 (0..number(o, "columns", "4", 1, 1000)? as usize).collect::<Vec<_>>()
             } else {
                 let k = key(keyword)?;
-                if k.len() > 1000 {
-                    return Err("Keyword is limited to 1000 letters.".into());
-                }
+                crate::limits::check(k.len(), 1000, "Keyword is limited to 1000 letters.")?;
                 let mut order: Vec<usize> = (0..k.len()).collect();
                 order.sort_by_key(|&i| k[i]);
                 order

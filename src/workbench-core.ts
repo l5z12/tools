@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { bypassLimits } from "./limits";
 import type { SuiteOptions, SuiteResult } from "./workbench-types";
 import type { SuiteRequest } from "./workers/protocol";
 import { runWorkerTask } from "./workers/task";
@@ -16,7 +17,7 @@ export function suiteCore(
         type: "module",
       }),
     request: { id, input, bytes, options },
-    timeoutMs: 60_000,
+    timeoutMs: bypassLimits(options) ? 0 : 60_000,
     timeoutMessage: "Processing exceeded 60 seconds. Try a smaller input.",
     failureMessage: "Workbench worker failed.",
     signal,

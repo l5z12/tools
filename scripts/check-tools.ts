@@ -3,7 +3,7 @@ import { workbenchIds } from "../src/lib/workbench-tools";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { tools } from "../src/lib/catalog";
-import init, { run } from "../public/wasm/l5z12_tools.js";
+import init, { run, set_bypass_limits } from "../public/wasm/l5z12_tools.js";
 await init({
   module_or_path: await readFile(
     new URL("../public/wasm/l5z12_tools_bg.wasm", import.meta.url),
@@ -42,6 +42,16 @@ assert.throws(() => run("json-format", '{"broken":', ""));
 assert.throws(() => run("hex-decode", "xyz", ""));
 assert.throws(() => run("percentage-change", "0, 10", ""));
 assert.throws(() => run("csv-to-json", "x,x\n1,2", ""));
+assert.throws(() => run("uppercase", "a".repeat(2_000_001), ""), /2 MB/);
+set_bypass_limits(true);
+try {
+  assert.equal(
+    run("uppercase", "a".repeat(2_000_001), ""),
+    "A".repeat(2_000_001),
+  );
+} finally {
+  set_bypass_limits(false);
+}
 console.log(
   `${tools.filter((t) => !workbenchIds.has(t.id) && !browserOnly.includes(t.id) && !t.id.startsWith("image-")).length} WASM examples passed; known answers and invalid inputs passed.`,
 );

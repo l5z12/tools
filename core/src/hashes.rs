@@ -174,15 +174,18 @@ pub fn execute(input: &str, source: &[u8], options: &Value) -> Result<Value, Str
     } else {
         parse_bytes(input, option(options, "inputFormat", "UTF-8"))?
     };
-    if selected.len() > 1 && bytes.len() > 1024 * 1024 {
-        return Err("Multiple-hash calculation is limited to 1 MiB; choose a single algorithm for larger files.".into());
+    if selected.len() > 1 {
+        crate::limits::check(
+            bytes.len(),
+            1024 * 1024,
+            "Multiple-hash calculation is limited to 1 MiB; choose a single algorithm for larger files.",
+        )?;
     }
     if selected
         .iter()
         .any(|definition| definition["name"] == "MD2")
-        && bytes.len() > 4 * 1024 * 1024
     {
-        return Err("MD2 is limited to 4 MiB.".into());
+        crate::limits::check(bytes.len(), 4 * 1024 * 1024, "MD2 is limited to 4 MiB.")?;
     }
     let length = option(options, "length", "32")
         .parse::<usize>()

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { SuiteOptions, SuiteResult } from "../workbench-types";
+import { armTimeout, overLimit } from "../limits";
 
 let activeCancel: (() => void) | undefined;
 export function cancelCpp(): void {
@@ -29,7 +30,7 @@ export async function runCpp(
 ): Promise<SuiteResult> {
   cancelCpp();
   const maximum = 1024 * 1024;
-  if (file && file.size > maximum)
+  if (file && overLimit(file.size, maximum, options))
     throw Error(`Choose a file up to ${maximum / 1024 / 1024} MiB.`);
   const status = container.querySelector<HTMLElement>("[data-cpp-status]")!;
   const stop = container.querySelector<HTMLButtonElement>("[data-cpp-stop]")!;
@@ -47,7 +48,8 @@ export async function runCpp(
     const bytes = file
       ? new Uint8Array(await Promise.race([file.arrayBuffer(), stopped]))
       : new TextEncoder().encode(input);
-    if (bytes.byteLength > maximum) throw Error("Text is limited to 1 MiB.");
+    if (overLimit(bytes.byteLength, maximum, options))
+      throw Error("Text is limited to 1 MiB.");
     // Inherit the page CSP on static hosts that do not supply worker headers.
     workerURL = URL.createObjectURL(
       new Blob(
@@ -70,12 +72,13 @@ export async function runCpp(
       worker!.onerror = (event) =>
         reject(Error(event.message || "C/C++ worker failed."));
     });
-    timer = setTimeout(
+    timer = armTimeout(
       () =>
         rejectStop(
           Error("C/C++ exceeded the 60-second limit. The worker was stopped."),
         ),
       60_000,
+      options,
     );
     worker.postMessage({
       id,

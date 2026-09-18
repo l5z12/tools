@@ -67,7 +67,10 @@ fn check_archive(archive: &Archive) -> Result<Vec<bool>, String> {
             }
             for file in archive.files() {
                 let compression = file.decoded_compression_info().map_err(|e| e.to_string())?;
-                if !file.is_stored() && compression.dictionary_size > LIMIT as u64 {
+                if !file.is_stored()
+                    && !crate::limits::enabled()
+                    && compression.dictionary_size > LIMIT as u64
+                {
                     return Err("RAR dictionaries larger than 64 MiB are not supported.".into());
                 }
                 redirected.push(file.is_redirection());
@@ -91,12 +94,12 @@ pub(super) fn inspect(
     let options = ArchiveReadOptions::with_optional_password(
         (!password.is_empty()).then_some(password.as_bytes()),
     )
-    .with_rar50_buffered_decode_limit(LIMIT as u64);
+    .with_rar50_buffered_decode_limit(crate::limits::cap(LIMIT) as u64);
     let archive = ArchiveReader::read_with_options(bytes, options).map_err(|e| e.to_string())?;
     let redirected = check_archive(&archive)?;
     let mut entries = Vec::new();
     for (index, member) in archive.members().enumerate() {
-        if index >= ENTRY_LIMIT {
+        if crate::limits::at_least(index, ENTRY_LIMIT) {
             return Err("Archive exceeds 500 entries.".into());
         }
         let meta = member.meta;

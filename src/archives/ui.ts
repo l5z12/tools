@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { suiteCore } from "../workbench-core";
 import type { SuiteOptions, SuiteResult } from "../workbench-types";
+import { formBypassLimits, overLimit } from "../limits";
 const INPUT_LIMIT = 32 * 1024 * 1024;
 type Source = { file: File; name: string };
 type State = { sources: Source[]; selected?: string[] };
@@ -156,11 +157,17 @@ function setupBuilder(
   const add = (files: FileList | null) => {
     const added = Array.from(files ?? []);
     if (
-      state.sources.length + added.length > 500 ||
-      [...state.sources.map((s) => s.file), ...added].reduce(
-        (sum, f) => sum + f.size,
-        0,
-      ) > INPUT_LIMIT
+      overLimit(state.sources.length + added.length, 500, {
+        bypassLimits: formBypassLimits(),
+      }) ||
+      overLimit(
+        [...state.sources.map((s) => s.file), ...added].reduce(
+          (sum, f) => sum + f.size,
+          0,
+        ),
+        INPUT_LIMIT,
+        { bypassLimits: formBypassLimits() },
+      )
     ) {
       status.textContent =
         "Choose at most 500 files and 32 MiB combined. These files were not added.";
@@ -234,12 +241,19 @@ function setupExplorer(
     try {
       const file = picker.files?.[0];
       if (!file) throw Error("Choose an archive first.");
-      if (file.size > INPUT_LIMIT) throw Error("Archive exceeds 32 MiB.");
+      if (
+        overLimit(file.size, INPUT_LIMIT, { bypassLimits: formBypassLimits() })
+      )
+        throw Error("Archive exceeds 32 MiB.");
       const result = await suiteCore(
         "archive-explorer",
         "",
         new Uint8Array(await file.arrayBuffer()),
-        { mode: "inspect", password: field(container, "password").value },
+        {
+          mode: "inspect",
+          password: field(container, "password").value,
+          bypassLimits: formBypassLimits(),
+        },
       );
       if (current !== revision || !container.isConnected) return;
       const rows = result.rows ?? [];
@@ -303,7 +317,10 @@ export async function buildArchive(
   const sources = states.get(container)?.sources ?? [];
   if (!sources.length) throw Error("Add files or a folder first.");
   const size = sources.reduce((sum, source) => sum + source.file.size, 0);
-  if (sources.length > 500 || size > INPUT_LIMIT)
+  if (
+    overLimit(sources.length, 500, options) ||
+    overLimit(size, INPUT_LIMIT, options)
+  )
     throw Error("Archive input exceeds 500 files or 32 MiB.");
   // Snapshot paths and File references before asynchronous reads.
   const snapshot = sources.map((source) => ({ ...source }));
@@ -331,7 +348,8 @@ export async function runArchives(
   const file =
     container.querySelector<HTMLInputElement>("#suite-file")!.files?.[0];
   if (!file) throw Error("Choose a file first.");
-  if (file.size > INPUT_LIMIT) throw Error("File exceeds 32 MiB.");
+  if (overLimit(file.size, INPUT_LIMIT, options))
+    throw Error("File exceeds 32 MiB.");
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (mode === "compress" || mode === "decompress")
     return suiteCore("compression-workbench", "", bytes, {

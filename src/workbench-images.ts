@@ -9,6 +9,7 @@ import {
 } from "./raster-client";
 import { suiteCore } from "./workbench-core";
 import type { SuiteFile, SuiteOptions, SuiteResult } from "./workbench-types";
+import { overLimit } from "./limits";
 const b64 = (bytes: Uint8Array) => {
   let s = "";
   for (let i = 0; i < bytes.length; i += 8192)
@@ -29,7 +30,7 @@ export async function imageSuite(
   o: SuiteOptions,
 ): Promise<SuiteResult> {
   if (!files.length) throw Error("Choose an image first.");
-  if (files.length > 64) throw Error("Choose at most 64 images.");
+  if (overLimit(files.length, 64, o)) throw Error("Choose at most 64 images.");
   if (id === "image-compare" && files.length !== 2)
     throw Error("Choose exactly two images.");
   if (!["sprite-builder", "image-compare"].includes(id) && files.length !== 1)
@@ -37,16 +38,16 @@ export async function imageSuite(
   const images: Raster[] = [];
   let total = 0;
   for (const f of files) {
-    if (f.size > 32 * 1024 * 1024)
+    if (overLimit(f.size, 32 * 1024 * 1024, o))
       throw Error("Each file must be under 32 MiB.");
-    const im = await decodeRaster(f);
+    const im = await decodeRaster(f, o);
     images.push(im);
     total += im.width * im.height;
     if (
-      im.width * im.height > 8_388_608 ||
-      im.width > 8192 ||
-      im.height > 8192 ||
-      total > 16_777_216
+      overLimit(im.width * im.height, 8_388_608, o) ||
+      overLimit(im.width, 8192, o) ||
+      overLimit(im.height, 8192, o) ||
+      overLimit(total, 16_777_216, o)
     )
       throw Error("Images exceed the pixel limit (8 MP each, 16 MP total).");
   }
@@ -62,7 +63,7 @@ export async function imageSuite(
   if (id === "image-compare") {
     if (first.width !== images[1].width || first.height !== images[1].height)
       throw Error("Images must have identical dimensions. Resize them first.");
-    if (first.width * first.height > 4_194_304)
+    if (overLimit(first.width * first.height, 4_194_304, o))
       throw Error("Comparison accepts up to 4 megapixels per image.");
     const before = await png(first, "before.png");
     const after = await png(images[1], "after.png");
@@ -119,6 +120,7 @@ export async function imageSuite(
         sizes: images.map((image) => [image.width, image.height]),
         columns,
         gap,
+        bypassLimits: o.bypassLimits === true,
       }),
     );
     const coordinates = images.map((im, i) => {

@@ -21,10 +21,12 @@ mod developer;
 mod everyday;
 mod fingerprints;
 mod hashes;
+mod limits;
 mod output_format;
 mod rust_tools;
 mod sql_tools;
 pub use fingerprints::fingerprint_hash;
+pub use limits::set_bypass_limits;
 mod references;
 mod utilities;
 mod workbench;
@@ -78,9 +80,8 @@ fn title(s: &str) -> String {
         .unwrap_or_default()
 }
 pub fn process(id: &str, s: &str, o: &str) -> Result<String, String> {
-    if s.len() > 2_000_000 || o.len() > 2_000_000 {
-        return Err("Input exceeds the 2 MB text limit.".into());
-    }
+    crate::limits::check(s.len(), 2_000_000, "Input exceeds the 2 MB text limit.")?;
+    crate::limits::check(o.len(), 2_000_000, "Input exceeds the 2 MB text limit.")?;
     let err = |e: &dyn std::fmt::Display| e.to_string();
     if let Some(result) = developer::run(id, s, o) {
         return result;

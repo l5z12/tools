@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { SuiteOptions, SuiteResult } from "../workbench-types";
+import { armTimeout, overLimit } from "../limits";
 
 let activeCancel: (() => void) | undefined;
 export function cancelGo(): void {
@@ -29,7 +30,7 @@ export async function runGo(
 ): Promise<SuiteResult> {
   cancelGo();
   const maximum = (id === "go-build-info" ? 32 : 2) * 1024 * 1024;
-  if (file && file.size > maximum)
+  if (file && overLimit(file.size, maximum, options))
     throw Error(`Choose a file up to ${maximum / 1024 / 1024} MiB.`);
   if (id === "go-build-info" && !file)
     throw Error("Choose a Go executable first.");
@@ -49,7 +50,8 @@ export async function runGo(
     const bytes = file
       ? new Uint8Array(await Promise.race([file.arrayBuffer(), stopped]))
       : new TextEncoder().encode(input);
-    if (bytes.byteLength > maximum) throw Error("Text is limited to 2 MiB.");
+    if (overLimit(bytes.byteLength, maximum, options))
+      throw Error("Text is limited to 2 MiB.");
     // Inherit the page CSP on static hosts that do not supply worker headers.
     workerURL = URL.createObjectURL(
       new Blob(
@@ -72,12 +74,13 @@ export async function runGo(
       worker!.onerror = (event) =>
         reject(Error(event.message || "Go worker failed."));
     });
-    timer = setTimeout(
+    timer = armTimeout(
       () =>
         rejectStop(
           Error("Go exceeded the 30-second limit. The worker was stopped."),
         ),
       30_000,
+      options,
     );
     worker.postMessage({ id, bytes, options }, [bytes.buffer]);
     return await Promise.race([result, stopped]);

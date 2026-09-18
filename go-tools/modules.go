@@ -110,7 +110,7 @@ func inspectSums(input string) (result, error) {
 			kind = "go.mod"
 		}
 		rows = append(rows, map[string]any{"module": fields[0], "version": version, "kind": kind, "checksum": fields[2], "duplicate": duplicate})
-		if len(rows) > 20000 {
+		if over(len(rows), 20000) {
 			return result{}, fmt.Errorf("limit: 20,000 checksum entries")
 		}
 	}
@@ -144,7 +144,7 @@ func inspectVersions(input string) (result, error) {
 			}
 		}
 		rows = append(rows, row)
-		if len(rows) > 20000 {
+		if over(len(rows), 20000) {
 			return result{}, fmt.Errorf("limit: 20,000 versions")
 		}
 	}

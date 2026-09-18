@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { SuiteOptions } from "../workbench-types";
+import { bypassLimits, overLimit } from "../limits";
 
 export const MEDIA_LIMIT = 64 * 1024 * 1024;
 export type MediaStream = {
@@ -31,7 +32,7 @@ export function numeric(
       : typeof raw === "string" && raw.trim()
         ? Number(raw)
         : NaN;
-  if (!Number.isFinite(value) || value < min || value > max)
+  if (!Number.isFinite(value) || value < min || overLimit(value, max, options))
     throw Error(`${key} must be between ${min} and ${max}.`);
   return value;
 }
@@ -110,12 +111,19 @@ export function planMedia(
     throw Error("Choose a media file first.");
   if (id !== "audio-join" && paths.length !== 1)
     throw Error("Choose exactly one file.");
-  if (paths.length > 8) throw Error("Choose at most eight audio files.");
+  if (overLimit(paths.length, 8, options))
+    throw Error("Choose at most eight audio files.");
   const lengths = infos.map(duration);
   const seconds = lengths[0];
   if (
-    lengths.some((d) => d > 600) ||
-    (id === "audio-join" && lengths.reduce((a, b) => a + b, 0) > 600)
+    overLimit(
+      Math.max(
+        ...lengths,
+        id === "audio-join" ? lengths.reduce((a, b) => a + b, 0) : 0,
+      ),
+      600,
+      options,
+    )
   )
     throw Error("Media is limited to 10 minutes per job.");
   const video = infos[0].streams?.find((s) => s.codec_type === "video");
@@ -143,7 +151,8 @@ export function planMedia(
     !audioTool &&
     id !== "video-mute" &&
     video &&
-    (width * height > 1920 * 1080 || Math.max(width, height) > 1920)
+    (overLimit(width * height, 1920 * 1080, options) ||
+      overLimit(Math.max(width, height), 1920, options))
   )
     throw Error(
       "Video is limited to 1920×1080 pixels or the portrait equivalent.",
@@ -183,7 +192,8 @@ export function planMedia(
     case "video-resize": {
       const w = integer(options, "width", 2, 1920),
         h = integer(options, "height", 2, 1920);
-      if (w * h > 1920 * 1080) throw Error("Output dimensions exceed 1080p.");
+      if (overLimit(w * h, 1920 * 1080, options))
+        throw Error("Output dimensions exceed 1080p.");
       videoFilters.push(
         `scale=${w}:${h}:force_original_aspect_ratio=decrease:force_divisible_by=2`,
       );
@@ -424,8 +434,7 @@ export function planMedia(
     "-1",
     "-threads",
     "1",
-    "-fs",
-    String(MEDIA_LIMIT),
+    ...(bypassLimits(options) ? [] : ["-fs", String(MEDIA_LIMIT)]),
     output,
   );
   return { args, output, mime };
