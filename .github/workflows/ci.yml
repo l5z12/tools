@@ -1,0 +1,143 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  workflows:
+    name: Workflow validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go-tools/go.mod
+          cache: false
+      - name: Validate GitHub workflows
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          actionlint .github/workflows/*.yml
+
+  verify:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      RUST_VERSION: "1.97.1"
+      WASM_PACK_VERSION: "0.15.0"
+      CARGO_BUILD_JOBS: "2"
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.18.0"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go-tools/go.mod
+          cache-dependency-path: go-tools/go.sum
+      - name: Install Rust
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal --component rustfmt --target wasm32-unknown-unknown
+          rustup default "$RUST_VERSION"
+      - name: Cache build dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+          key: build-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ hashFiles('bun.lock', 'core/Cargo.lock', 'core/Cargo.toml', '.cargo/config.toml') }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-
+      - name: Cache wasm-pack
+        id: wasm-pack
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/wasm-pack
+          key: wasm-pack-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.WASM_PACK_VERSION }}
+      - name: Install wasm-pack
+        if: steps.wasm-pack.outputs.cache-hit != 'true'
+        run: cargo install wasm-pack --version "$WASM_PACK_VERSION" --locked --root "$RUNNER_TEMP/wasm-pack"
+      - name: Add wasm-pack to PATH
+        run: echo "$RUNNER_TEMP/wasm-pack/bin" >> "$GITHUB_PATH"
+      - name: Install reference programs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg 7zip 7zip-rar rar
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Cache verified runtime downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            work/rust-assets
+            public/cpp/clang.wasm
+            public/cpp/lld.wasm
+            public/cpp/sysroot.tar
+            public/python/packages
+          key: runtime-assets-${{ hashFiles('scripts/build-rust.ts', 'scripts/build-cpp.ts', 'scripts/build-python.ts', 'src/python/packages.ts') }}
+      - name: Check prerequisites
+        run: bun run doctor
+      - name: Verify source, all runtimes, and all test suites
+        run: bun run verify
+      - name: Validate static Cloudflare deployment
+        run: bun run deploy:check
+      - name: Test static hosting locally
+        env:
+          CLOUDFLARE_TEST_URL: http://127.0.0.1:8787
+          SECURITY_TEST_URL: http://127.0.0.1:8787
+        run: |
+          bun run dev:worker > "$RUNNER_TEMP/wrangler.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..60}; do
+            if curl --fail --silent "$CLOUDFLARE_TEST_URL/" > /dev/null; then
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat "$RUNNER_TEMP/wrangler.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          bun run test:cloudflare
+          bun run test:security
+          bun run test:routing
+      - name: Ensure builds preserve dependency locks
+        run: git diff --exit-code -- bun.lock core/Cargo.lock go-tools/go.mod go-tools/go.sum
+      - name: Save verified site
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: static-site
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 6
+
+  deploy:
+    name: Deploy to Cloudflare
+    needs: [workflows, verify]
+    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    uses: ./.github/workflows/publish.yml

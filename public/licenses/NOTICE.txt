@@ -1,0 +1,28 @@
+Runtime license notices
+
+L5Z12 Tools source code: AGPL-3.0-only.
+https://github.com/l5z12/tools
+
+Dependencies retain their own licenses. These notices accompany runtime packages
+whose npm distributions omit their license text.
+
+@ffmpeg/ffmpeg 0.12.15: MIT.
+Copyright (c) 2019 Jerome Wu.
+License: ffmpeg-wrapper.MIT.txt
+Source: https://github.com/ffmpegwasm/ffmpeg.wasm/tree/v12.15/packages/ffmpeg
+
+@ffmpeg/core 0.12.10: GPL-2.0-or-later.
+License: ffmpeg-core.GPL-2.0.txt
+Source and build scripts: https://github.com/ffmpegwasm/ffmpeg.wasm/tree/v12.15
+FFmpeg sources: https://github.com/FFmpeg/FFmpeg
+Individual codec and library notices remain in their upstream source trees.
+
+Pyodide 314.0.7: MPL-2.0.
+License: pyodide.MPL-2.0.txt
+Source and build scripts: https://github.com/pyodide/pyodide/tree/314.0.7
+Python and bundled packages retain their respective upstream licenses.
+
+Other runtime notices accompany their files under /cpp/, /fingerprint/, /go/,
+/image-codecs/, /python/, /rust/, and /sql/. Reference data attribution is in
+/data/references/NOTICE.txt. The source repository retains vendored collector
+licenses under vendor/ and exact dependency versions in the lockfiles.

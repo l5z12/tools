@@ -1,0 +1,15 @@
+* text=auto
+*.ts text eol=lf
+*.js text eol=lf
+*.rs text eol=lf
+*.go text eol=lf
+*.astro text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.wasm binary
+*.png binary
+*.avif binary
+*.zip binary
+*.gz binary
+*.zst binary

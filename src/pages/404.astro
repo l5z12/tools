@@ -1,0 +1,33 @@
+---
+// SPDX-License-Identifier: AGPL-3.0-only
+import "../styles.css";
+import { contentSecurityPolicy } from "../lib/security";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content={contentSecurityPolicy(import.meta.env.DEV)}
+    />
+    <meta name="robots" content="noindex" />
+    <title>Page not found — L5Z12 Tools</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script is:inline src="/theme.js"></script>
+  </head>
+  <body>
+    <main class="page">
+      <p class="muted mono">404 / L5Z12 Tools</p>
+      <hr class="rule" />
+      <h1 class="view-title">Page not found</h1>
+      <p>
+        This tool link is unavailable. Search the directory to find what you
+        need.
+      </p>
+      <a href="/">Browse all tools →</a>
+    </main>
+  </body>
+</html>

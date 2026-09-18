@@ -1,0 +1,41 @@
+L5Z12 Tools — reference data attribution
+
+Project source code is AGPL-3.0-only. The upstream reference data retains its
+respective ownership and licensing terms; it is not relicensed as project code.
+
+Microsoft data
+Copyright Microsoft Corporation. Derived from Microsoft Open Specifications,
+[MS-ERREF]: Windows Error Codes, HRESULT / Win32 / NTSTATUS tables, facility
+definitions, and LDAP-to-Win32 mappings. Whitespace has been normalized; numeric
+representations and search metadata have been added. Aliases and blank mapping
+rows are retained. Source links, publication metadata and source hashes are
+included in each JSON snapshot.
+
+Microsoft's Open Specifications notice permits copies for developing
+implementations of the documented technologies and distribution of portions
+within implementations or documentation as necessary to document them.
+The full notice and its conditions are available here:
+https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/1bc92ddf-b79e-413c-bbaa-99a5281a6c90
+
+MS-ERREF covers codes referenced by the Windows protocol documentation set.
+It is not an exhaustive list of every Microsoft product-specific error.
+Snapshots are generated from Microsoft's structured HTML tables, which avoid
+the line wrapping and page-header artifacts of extracting the same tables
+from the PDF publication.
+
+IANA data
+Derived from the IANA HTTP Status Code, Domain Name System Parameters, Media
+Types, and Service Name and Transport Protocol Port Number registries.
+The data is available under IANA's licensing terms:
+https://www.iana.org/help/licensing-terms
+Source documents and content hashes are recorded in the JSON snapshots.
+Names, ranges, obsolete/temporary labels and registry references are retained.
+These snapshots are reference information, not live network measurements.
+
+Regeneration
+bun run build:wasm
+bun run generate:references
+Cached sources can be reprocessed using:
+bun run generate:references --offline
+The generation script is scripts/generate-references.ts. Raw downloaded
+sources are kept in the ignored work/reference-sources directory.

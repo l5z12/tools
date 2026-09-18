@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: cargo
+    directory: /core
+    schedule:
+      interval: weekly
+    ignore:
+      # These indirect releases currently break OXVG's compatible version range.
+      - dependency-name: parcel_selectors
+      - dependency-name: oxvg_path
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: gomod
+    directory: /go-tools
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]

@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "l5z12-tools",
+  "compatibility_date": "2026-09-17",
+  "workers_dev": true,
+  "send_metrics": false,
+  "build": {
+    "command": "bun run package:cloudflare",
+    "watch_dir": ["dist"],
+  },
+  "assets": {
+    "directory": "work/cloudflare/assets",
+    "not_found_handling": "none",
+    "html_handling": "auto-trailing-slash",
+  },
+  "routes": [
+    {
+      "pattern": "tools.l5z12.dev",
+      "custom_domain": true
+    }
+  ]
+}

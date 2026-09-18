@@ -1,0 +1,134 @@
+[
+  {
+    "schema": 1,
+    "id": "microsoft",
+    "title": "Microsoft MS-ERREF error codes",
+    "generated": "2026-09-14",
+    "notice": "Microsoft Open Specifications / MS-ERREF. Microsoft retains copyright in its documentation. Extracted reference data is attributed to Microsoft and is not relicensed as project code. See the source document’s Intellectual Property Rights Notice. Scope: all rows in the published MS-ERREF HTML tables. Publication: MS-ERREF 23.0 / 11/19/2024.",
+    "sources": [
+      {
+        "title": "MS-ERREF HRESULT",
+        "url": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/705fb797-2175-4a90-b5a3-3918024b10b8",
+        "sha256": "f00d9d3a541b0f3656db592b0a9b2a3c7f051f636cedff78869381f94ad25ac5",
+        "rows": 2928,
+        "updated": "MS-ERREF 23.0 / 11/19/2024"
+      },
+      {
+        "title": "MS-ERREF Win32",
+        "url": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/18d8fbe8-a967-4f1c-ae50-99ca8e491d2d",
+        "sha256": "80030ea196a9b9dca4ce6f99b7c06e49c45ec794160f6e236fab9c83f67a296d",
+        "rows": 2704,
+        "updated": "MS-ERREF 23.0 / 11/19/2024"
+      },
+      {
+        "title": "MS-ERREF NTSTATUS",
+        "url": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/596a1078-e883-4972-9bbc-49e60bebca55",
+        "sha256": "82e5f531a1597baffa284e37d9d0f82a540eaf59d7fd6125b30389e9ce957798",
+        "rows": 1799,
+        "updated": "MS-ERREF 23.0 / 11/19/2024"
+      },
+      {
+        "title": "MS-ERREF HRESULT layout and facilities",
+        "url": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/0642cb2f-2075-4469-918c-4441e69c548a",
+        "sha256": "6d4b07d23789ae5cc2f97844f1e3a75bc9379b845afb60d542867393481cc9b5",
+        "rows": 52
+      },
+      {
+        "title": "MS-ERREF publication and rights notice",
+        "url": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/1bc92ddf-b79e-413c-bbaa-99a5281a6c90",
+        "sha256": "54c906c851ba4012049de011ff863b3234d32d1ab032fa6ca9be172ee618805d",
+        "rows": 0,
+        "updated": "MS-ERREF 23.0 / 11/19/2024"
+      }
+    ],
+    "count": 7431,
+    "sha256": "7b61d6dc30c298dcc65d0a66bf8575144c19ba5b8d00b01b5f4e449985493af6"
+  },
+  {
+    "schema": 1,
+    "id": "ldap",
+    "title": "LDAP to Win32 mappings",
+    "generated": "2026-09-14",
+    "notice": "Microsoft Open Specifications / MS-ERREF. Microsoft retains copyright in its documentation. Extracted reference data is attributed to Microsoft and is not relicensed as project code. See the source document’s Intellectual Property Rights Notice. Scope: all rows in the published MS-ERREF HTML tables. Publication: MS-ERREF 23.0 / 11/19/2024.",
+    "sources": [
+      {
+        "title": "MS-ERREF LDAP to Win32 mapping",
+        "url": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/a465ae57-5f89-4539-88b3-90cf37a5ae06",
+        "sha256": "fac1d4f4c866d7fb11827b9d45742ffd306cbd707758b60afc4b0b3c17b607b6",
+        "rows": 99
+      }
+    ],
+    "count": 99,
+    "sha256": "9a5066d03d148b7578361c44172fe5f1369e56637a4d0414f02814dad9396da1"
+  },
+  {
+    "schema": 1,
+    "id": "http",
+    "title": "HTTP status codes",
+    "generated": "2026-09-14",
+    "notice": "Source: IANA protocol registries. Registry data is provided under IANA licensing terms: https://www.iana.org/help/licensing-terms. This is a dated local snapshot; consult the source for subsequent changes.",
+    "sources": [
+      {
+        "title": "IANA HTTP status codes",
+        "url": "https://www.iana.org/assignments/http-status-codes/http-status-codes-1.csv",
+        "sha256": "4a9550d4b4ae49cf41cf9050cf9b56b0d6082ad1edfc0e2b09b07f251a36d7a4",
+        "rows": 75
+      }
+    ],
+    "count": 75,
+    "sha256": "28603ff4702f806a11ae292eaca7eb86e544859d7aec1dcc1b851730b62bb515"
+  },
+  {
+    "schema": 1,
+    "id": "ports",
+    "title": "Service names and transport ports",
+    "generated": "2026-09-14",
+    "notice": "Source: IANA protocol registries. Registry data is provided under IANA licensing terms: https://www.iana.org/help/licensing-terms. This is a dated local snapshot; consult the source for subsequent changes.",
+    "sources": [
+      {
+        "title": "IANA Service names and transport ports",
+        "url": "https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.csv",
+        "sha256": "34328ed0940d889207de6da29bf0e6e1438d604483c8e1ffb03dceab8f7ec26f",
+        "rows": 14535
+      }
+    ],
+    "count": 14535,
+    "sha256": "95db8aa09c9b8a9ce3772c866ee82793783ae0f3ce12418cc89326cc3198019a"
+  },
+  {
+    "schema": 1,
+    "id": "dns",
+    "title": "DNS records and response codes",
+    "generated": "2026-09-14",
+    "notice": "Source: IANA protocol registries. Registry data is provided under IANA licensing terms: https://www.iana.org/help/licensing-terms. This is a dated local snapshot; consult the source for subsequent changes.",
+    "sources": [
+      {
+        "title": "IANA DNS records and response codes",
+        "url": "https://www.iana.org/assignments/dns-parameters/dns-parameters.xml",
+        "sha256": "dbddd85b4f05fe41f1a200ead5441d769041dc6f92d12561ea14ee996fa2a27c",
+        "rows": 154,
+        "updated": "2026-08-28"
+      }
+    ],
+    "count": 154,
+    "sha256": "bf57eba04150fae07e27ce507b2b0046eed1aa63a14c003ad4cda913ebd08338"
+  },
+  {
+    "schema": 1,
+    "id": "mime",
+    "title": "Media types",
+    "generated": "2026-09-14",
+    "notice": "Source: IANA protocol registries. Registry data is provided under IANA licensing terms: https://www.iana.org/help/licensing-terms. This is a dated local snapshot; consult the source for subsequent changes.",
+    "sources": [
+      {
+        "title": "IANA Media types",
+        "url": "https://www.iana.org/assignments/media-types/media-types.xml",
+        "sha256": "2af32eea294667f49c55c7121ba99c927764b5e465f4d3853d26a754ebb68490",
+        "rows": 2348,
+        "updated": "2026-09-03"
+      }
+    ],
+    "count": 2348,
+    "sha256": "c92ac36578640a271fc87c12a3c8005bf2d68f8dd69fcffe41916327bb294b99"
+  }
+]

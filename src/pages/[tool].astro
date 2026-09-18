@@ -1,0 +1,17 @@
+---
+// SPDX-License-Identifier: AGPL-3.0-only
+import ToolboxPage from "../components/ToolboxPage.astro";
+import { tools } from "../lib/catalog";
+import type { Tool } from "../lib/tool-types";
+
+export function getStaticPaths() {
+  return tools.map((tool) => ({ params: { tool: tool.id }, props: { tool } }));
+}
+
+interface Props {
+  tool: Tool;
+}
+const { tool } = Astro.props;
+---
+
+<ToolboxPage tool={tool} />
