@@ -218,10 +218,11 @@ for (const [name, archivePassword] of [
   extractNative(path, dest, archivePassword);
   const resultBytes = extracted(result);
   for (let index = 0; index < rows.length; index++) {
+    const member = String(rows[index].name);
     assert.deepEqual(
       resultBytes[index],
-      await readFile(join(dest, rows[index].name)),
-      `${name}: ${rows[index].name}`,
+      await readFile(join(dest, member)),
+      `${name}: ${member}`,
     );
   }
 }
