@@ -66,7 +66,7 @@ cbc = {version="0.1", features=["alloc", "block-padding"]}
 ctr = "0.9"
 des = "0.8"
 blowfish = "0.9"
-twofish = "0.7"
+twofish = "0.8"
 serpent = "0.5"
 camellia = "0.1"
 pbkdf2 = "0.12"
