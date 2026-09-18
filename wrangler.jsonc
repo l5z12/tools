@@ -17,7 +17,7 @@
   "routes": [
     {
       "pattern": "tools.l5z12.dev",
-      "custom_domain": true
-    }
-  ]
+      "custom_domain": true,
+    },
+  ],
 }
