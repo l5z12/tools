@@ -83,7 +83,7 @@ fn digest(algorithm: &str, input: &[u8], length: usize, seed: u64) -> Result<Vec
         "Streebog-512" => streebog::Streebog512::digest(input).to_vec(),
         "MD2" => md2::Md2::digest(input).to_vec(),
         "MD4" => md4::Md4::digest(input).to_vec(),
-        "MD5" => md5::Md5::digest(input).to_vec(),
+        "MD5" => <md5::Md5 as md5::Digest>::digest(input).to_vec(),
         "SHA-1" => sha1::Sha1::digest(input).to_vec(),
         "RIPEMD-128" => ripemd::Ripemd128::digest(input).to_vec(),
         "RIPEMD-160" => ripemd::Ripemd160::digest(input).to_vec(),
