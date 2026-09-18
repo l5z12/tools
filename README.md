@@ -64,7 +64,7 @@ bun run deploy
 
 CI runs on pushes and pull requests: formatting, SPDX headers, types, every runtime build and test suite, and a Cloudflare deployment dry run. Successful runs include a `static-site` artifact retained for seven days. Dependabot opens weekly updates for Bun, Cargo, Go, and GitHub Actions.
 
-Add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` as secrets in the repository's `production` environment. Pushes to the default branch automatically publish that run's verified static site after all CI checks pass. Pull requests and other branches only run checks. **Deploy to Cloudflare** remains available for manual runs from the default branch.
+Add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` as Actions secrets (repository secrets or the `production` environment). Pushes to the default branch automatically publish that run's verified static site after all CI checks pass. Pull requests and other branches only run checks. **Deploy to Cloudflare** remains available for manual runs from the default branch.
 
 ## License
 
