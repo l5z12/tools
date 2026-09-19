@@ -40,7 +40,7 @@ miniz_oxide = "0.8"
 crc32fast = "1"
 semver = "1"
 shlex = "1"
-cron = "0.15"
+cron = "0.17"
 jsonschema = {version = "0.33", default-features = false}
 hmac = "0.12"
 x509-parser = "0.18"
