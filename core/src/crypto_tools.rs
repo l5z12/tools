@@ -3,13 +3,12 @@ use crate::{
     codecs::{bytes_result, parse_bytes},
     workbench::{code, file, option},
 };
-use aes::cipher::{
-    block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit, StreamCipher,
-};
 use aes_gcm::{
     aead::{Aead, Payload},
     KeyInit,
 };
+// These ciphers still use cipher 0.4; AES and Twofish use cipher 0.5 below.
+use cbc::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
 use serde_json::{json, Value};
 use sha2::Sha256;
 
@@ -51,6 +50,7 @@ fn transform(
     }
     macro_rules! ctr {
         ($ty:ty) => {{
+            use ctr::cipher::{KeyIvInit, StreamCipher};
             let mut cipher = ctr::Ctr128BE::<$ty>::new_from_slices(key, iv)
                 .map_err(|_| "Invalid key or counter length.")?;
             let mut out = input.to_vec();
@@ -63,16 +63,17 @@ fn transform(
     match id {
         "crypto-aes-gcm" => match key.len() {
             16 => aead!(aes_gcm::Aes128Gcm),
-            24 => aead!(aes_gcm::AesGcm<aes::Aes192,aes_gcm::aead::consts::U12>),
+            // aes-gcm 0.10 requires its own compatible AES version.
+            24 => aead!(aes_gcm::AesGcm<aes_gcm::aes::Aes192,aes_gcm::aead::consts::U12>),
             32 => aead!(aes_gcm::Aes256Gcm),
             _ => Err("AES key must be 16, 24 or 32 bytes.".into()),
         },
         "crypto-chacha20-poly1305" => aead!(chacha20poly1305::ChaCha20Poly1305),
         "crypto-xchacha20-poly1305" => aead!(chacha20poly1305::XChaCha20Poly1305),
         "crypto-aes-cbc" => match key.len() {
-            16 => cbc!(aes::Aes128),
-            24 => cbc!(aes::Aes192),
-            32 => cbc!(aes::Aes256),
+            16 => cbc_modern::<aes::Aes128>(key, iv, input, decrypt),
+            24 => cbc_modern::<aes::Aes192>(key, iv, input, decrypt),
+            32 => cbc_modern::<aes::Aes256>(key, iv, input, decrypt),
             _ => Err("AES key must be 16, 24 or 32 bytes.".into()),
         },
         "crypto-aes-ctr" => match key.len() {
@@ -84,7 +85,7 @@ fn transform(
         "crypto-des-cbc" => cbc!(des::Des),
         "crypto-3des-cbc" => cbc!(des::TdesEde3),
         "crypto-blowfish-cbc" => cbc!(blowfish::Blowfish),
-        "crypto-twofish-cbc" => twofish_cbc(key, iv, input, decrypt),
+        "crypto-twofish-cbc" => cbc_modern::<twofish::Twofish>(key, iv, input, decrypt),
         "crypto-serpent-cbc" => {
             if ![16, 24, 32].contains(&key.len()) {
                 return Err("Serpent key must be 16, 24 or 32 bytes.".into());
@@ -101,12 +102,17 @@ fn transform(
     }
 }
 
-fn twofish_cbc(key: &[u8], iv: &[u8], input: &[u8], decrypt: bool) -> Result<Vec<u8>, String> {
-    use twofish::cipher::{
+fn cbc_modern<C>(key: &[u8], iv: &[u8], input: &[u8], decrypt: bool) -> Result<Vec<u8>, String>
+where
+    C: cbc02::cipher::BlockCipherEncrypt<BlockSize = cbc02::cipher::consts::U16>
+        + cbc02::cipher::BlockCipherDecrypt
+        + cbc02::cipher::KeyInit,
+{
+    use cbc02::cipher::{
         array::Array, block_padding::Pkcs7, consts::U16, BlockModeDecrypt, BlockModeEncrypt,
-        InnerIvInit, KeyInit,
+        InnerIvInit,
     };
-    let cipher = twofish::Twofish::new_from_slice(key).map_err(|_| "Invalid key or IV length.")?;
+    let cipher = C::new_from_slice(key).map_err(|_| "Invalid key or IV length.")?;
     let iv = Array::<u8, U16>::try_from(iv).map_err(|_| "Invalid key or IV length.")?;
     if decrypt {
         cbc02::Decryptor::inner_iv_init(cipher, &iv)
@@ -270,10 +276,16 @@ mod tests {
     #[test]
     fn roundtrips_and_authentication() {
         for (id, k, n) in [
+            ("aes-gcm", 16, 12),
+            ("aes-gcm", 24, 12),
             ("aes-gcm", 32, 12),
             ("chacha20-poly1305", 32, 12),
             ("xchacha20-poly1305", 32, 24),
+            ("aes-cbc", 16, 16),
+            ("aes-cbc", 24, 16),
             ("aes-cbc", 32, 16),
+            ("aes-ctr", 16, 16),
+            ("aes-ctr", 24, 16),
             ("aes-ctr", 32, 16),
             ("des-cbc", 8, 8),
             ("3des-cbc", 24, 8),
