@@ -7,7 +7,7 @@ use aes_gcm::{
     aead::{Aead, Payload},
     KeyInit,
 };
-// These ciphers still use cipher 0.4; AES and Twofish use cipher 0.5 below.
+// DES, Blowfish and Camellia still use cipher 0.4.
 use cbc::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
 use serde_json::{json, Value};
 use sha2::Sha256;
@@ -90,7 +90,7 @@ fn transform(
             if ![16, 24, 32].contains(&key.len()) {
                 return Err("Serpent key must be 16, 24 or 32 bytes.".into());
             }
-            cbc!(serpent::Serpent)
+            cbc_modern::<serpent::Serpent>(key, iv, input, decrypt)
         }
         "crypto-camellia-cbc" => match key.len() {
             16 => cbc!(camellia::Camellia128),
@@ -291,6 +291,8 @@ mod tests {
             ("3des-cbc", 24, 8),
             ("blowfish-cbc", 32, 8),
             ("twofish-cbc", 32, 16),
+            ("serpent-cbc", 16, 16),
+            ("serpent-cbc", 24, 16),
             ("serpent-cbc", 32, 16),
             ("camellia-cbc", 32, 16),
         ] {
