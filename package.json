@@ -72,13 +72,13 @@
     "@napi-rs/canvas": "^1.0.9",
     "@types/bun": "^1.4.2",
     "@types/sql.js": "^1.4.11",
-    "astro": "^7.3.2",
+    "astro": "^7.3.4",
     "happy-dom": "^20.14.5",
     "jose": "^6.2.12",
-    "prettier": "^3.9.6",
-    "prettier-plugin-astro": "^1.0.0",
+    "prettier": "^3.9.8",
+    "prettier-plugin-astro": "^1.0.1",
     "typescript": "~7.0.2",
-    "wrangler": "4.133.0"
+    "wrangler": "4.136.3"
   },
   "repository": {
     "type": "git",
@@ -92,7 +92,7 @@
     "@fingerprintjs/fingerprintjs": "3.4.2",
     "@jsquash/avif": "2.1.1",
     "@jsquash/webp": "1.5.0",
-    "@wasm-fmt/clang-format": "23.1.0",
+    "@wasm-fmt/clang-format": "23.1.1",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/xterm": "6.0.0",
     "pyodide": "314.0.7",
