@@ -16,7 +16,7 @@ ciborium = "0.2.2"
 ciborium-ll = "0.2.2"
 sourcemap = "9"
 rustc-demangle = "0.1"
-syn = { version = "2", features = ["full", "extra-traits", "visit"] }
+syn = { version = "3", features = ["full", "extra-traits", "visit"] }
 quote = "1"
 proc-macro2 = { version = "1", features = ["span-locations"] }
 wat = "1.259"
