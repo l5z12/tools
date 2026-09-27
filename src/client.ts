@@ -549,7 +549,11 @@ $("download").onclick = () => {
         ? "jpg"
         : blob.type === "image/webp"
           ? "webp"
-          : "png";
+          : blob.type === "image/heic"
+            ? "heic"
+            : blob.type === "image/heif"
+              ? "heif"
+              : "png";
   }
   const u = URL.createObjectURL(blob);
   const a = document.createElement("a");

@@ -2208,6 +2208,16 @@
     "description": "将本地图像转为 WebP。",
     "optionLabel": "质量（1–100）"
   },
+  "image-heic": {
+    "name": "图像 → HEIC",
+    "description": "将本地图像转为带白色背景的 HEIC。质量越高，文件越大。",
+    "optionLabel": "质量（1–100）"
+  },
+  "image-heif": {
+    "name": "图像 → HEIF",
+    "description": "使用 HEVC 压缩将本地图像转为带白色背景的 HEIF。质量越高，文件越大。",
+    "optionLabel": "质量（1–100）"
+  },
   "image-jpeg": {
     "name": "图像 → JPEG",
     "description": "将本地图像转为带白色背景的 JPEG。",

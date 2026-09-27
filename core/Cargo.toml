@@ -100,6 +100,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 oxvg_optimiser = "0.0.5"
 oxvg_ast = { version = "0.0.5", features = ["parse", "roxmltree"] }
 heic = { version = "=0.1.6", default-features = false }
+still265 = { version = "=0.6.0", default-features = false, features = ["std"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }
@@ -110,6 +111,9 @@ getrandom02 = { version = "0.2", package = "getrandom", features = ["js"] }
 [profile.release]
 opt-level = "s"
 lto = true
+
+[patch.crates-io]
+still265 = { path = "../vendor/still265" }
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false

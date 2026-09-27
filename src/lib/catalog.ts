@@ -635,6 +635,24 @@ const catalog: Tool[] = [
     "90",
     "Quality (1–100)",
   ),
+  row(
+    "Images & documents",
+    "image-heic",
+    "Image → HEIC",
+    "Convert a local image to HEIC with a white background. Higher quality produces larger files.",
+    "",
+    "80",
+    "Quality (1–100)",
+  ),
+  row(
+    "Images & documents",
+    "image-heif",
+    "Image → HEIF",
+    "Convert a local image to HEIF using HEVC compression with a white background. Higher quality produces larger files.",
+    "",
+    "80",
+    "Quality (1–100)",
+  ),
 ];
 
 const legacyTags: Record<string, string[]> = {
