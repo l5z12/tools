@@ -29,7 +29,9 @@ export async function processImage(
     };
     return {
       blob: file,
-      url: URL.createObjectURL(file),
+      url: URL.createObjectURL(
+        new Blob([await encodeRaster(image)], { type: "image/png" }),
+      ),
       meta,
       text: JSON.stringify(meta, null, 2),
     };

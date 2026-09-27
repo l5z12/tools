@@ -535,6 +535,26 @@ Object.assign(globalThis, {
   },
 });
 const { imageSuite } = await import("../src/workbench-images");
+const { processImage } = await import("../src/image-tools");
+const heicFile = new File(
+  [new Uint8Array(await readFile("scripts/fixtures/heic/rainbow.heic"))],
+  "photo.HEIC",
+  { type: "" },
+);
+const heicInspection = await processImage("image-inspect", heicFile, "");
+assert.equal(heicInspection.meta.Width, 451);
+assert.equal(heicInspection.blob, heicFile);
+const heicPreview = await fetch(heicInspection.url);
+assert.equal(heicPreview.headers.get("content-type"), "image/png");
+assert.equal(
+  (await loadImage(Buffer.from(await heicPreview.arrayBuffer()))).width,
+  451,
+);
+URL.revokeObjectURL(heicInspection.url);
+assert.ok(
+  (await imageSuite("palette-extractor", [heicFile], { count: 4 })).colors
+    ?.length,
+);
 const c = createCanvas(2, 2);
 const ctx = c.getContext("2d");
 ctx.fillStyle = "#ff0000";

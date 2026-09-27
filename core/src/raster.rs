@@ -33,6 +33,27 @@ fn packed(image: RgbaImage) -> Vec<u8> {
 pub fn decode_raster(bytes: &[u8]) -> Result<Vec<u8>, JsValue> {
     (|| -> Result<Vec<u8>, String> {
         crate::limits::check(bytes.len(), 32 * 1024 * 1024, "Image exceeds 32 MiB.")?;
+        // HEIF containers are decoded by pure Rust inside the same WASM module.
+        // The browser routes AVIF to its existing dedicated AV1 WASM codec.
+        if bytes.get(4..8) == Some(b"ftyp") {
+            let mut limits = heic::Limits::default();
+            if !crate::limits::enabled() {
+                limits.max_width = Some(8192);
+                limits.max_height = Some(8192);
+                limits.max_pixels = Some(32_000_000);
+                limits.max_memory_bytes = Some(192 * 1024 * 1024);
+            }
+            let decoded = heic::DecoderConfig::new()
+                .decode_request(bytes)
+                .with_output_layout(heic::PixelLayout::Rgba8)
+                .with_limits(&limits)
+                .decode()
+                .map_err(|e| format!("HEIC/HEIF decoding failed: {e}"))?;
+            check(decoded.width, decoded.height)?;
+            let image = RgbaImage::from_raw(decoded.width, decoded.height, decoded.data)
+                .ok_or("Invalid HEIC/HEIF pixel data.")?;
+            return Ok(packed(image));
+        }
         let mut reader = ImageReader::new(Cursor::new(bytes))
             .with_guessed_format()
             .map_err(|e| e.to_string())?;

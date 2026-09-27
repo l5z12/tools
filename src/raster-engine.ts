@@ -9,15 +9,15 @@ import {
 } from "./generated/l5z12_tools";
 import type { ImageRequest } from "./workers/protocol";
 import { overLimit } from "./limits";
+import { rasterContainer } from "./image-formats";
 
 export async function runImageRequest(
   data: ImageRequest,
 ): Promise<Uint8Array<ArrayBuffer>> {
   switch (data.kind) {
     case "decode": {
-      // ISO-BMFF AVIF uses libavif WASM; other formats use the Rust decoder.
-      const brand = new TextDecoder().decode(data.pixels.subarray(4, 32));
-      if (brand.includes("ftyp") && /avif|avis/.test(brand)) {
+      const container = rasterContainer(data.pixels);
+      if (container === "avif") {
         const { default: decode, init } =
           await import("@jsquash/avif/decode.js");
         await init({

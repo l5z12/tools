@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { inflateSync } from "node:zlib";
+import { rasterContainer, imageAccept } from "../src/image-formats";
 import init, {
   decode_raster,
   encode_raster,
@@ -151,4 +152,48 @@ await writeFile(
 );
 console.log(
   "Rust raster decode, PNG/JPEG encode, resizing, sprite composition, malformed files, and allocation bounds passed.",
+);
+
+// Exercise the compiled Rust HEVC decoder, including ordinary conversion paths.
+const heic = new Uint8Array(
+  await readFile("scripts/fixtures/heic/rainbow.heic"),
+);
+assert.equal(rasterContainer(heic), "heif");
+assert.ok(imageAccept.includes(".heic") && imageAccept.includes(".heif"));
+const decodedHeic = decode_raster(heic);
+const heicHeader = new DataView(decodedHeic.buffer, decodedHeic.byteOffset);
+assert.equal(heicHeader.getUint32(0, true), 451);
+assert.equal(heicHeader.getUint32(4, true), 461);
+const heicPixels = decodedHeic.slice(8);
+assert.equal(heicPixels.length, 451 * 461 * 4);
+assert.ok(
+  new Set(heicPixels).size > 100,
+  "Decode must produce actual color pixels.",
+);
+const heicPng = encode_raster(451, 461, heicPixels, "png", 80);
+assert.deepEqual(decode_raster(heicPng), decodedHeic);
+const heicJpeg = await loadImage(
+  Buffer.from(encode_raster(451, 461, heicPixels, "jpeg", 90)),
+);
+assert.equal(heicJpeg.width, 451);
+assert.equal(heicJpeg.height, 461);
+assert.equal(
+  resize_raster(451, 461, heicPixels, 45, 46, false, new Uint8Array()).length,
+  8 + 45 * 46 * 4,
+);
+assert.throws(
+  () => decode_raster(heic.slice(0, 40)),
+  /HEIC\/HEIF decoding failed/,
+);
+const oversizedHeic = Buffer.from(heic);
+const ispe = oversizedHeic.indexOf("ispe");
+assert.ok(ispe > 0);
+oversizedHeic.writeUInt32BE(100_000, ispe + 8);
+assert.throws(() => decode_raster(oversizedHeic), /limit|exceed/i);
+const avif = new Uint8Array(await readFile(".astro/wasm-raster-test.avif"));
+assert.equal(rasterContainer(avif), "avif");
+assert.equal(rasterContainer(encodedPng), undefined);
+assert.equal(rasterContainer(heic.slice(0, 12)), undefined);
+console.log(
+  "HEIC WASM decode, PNG/JPEG conversion, resizing, malformed input, limits, and AVIF routing passed.",
 );

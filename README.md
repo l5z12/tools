@@ -24,6 +24,8 @@ The public site is https://tools.l5z12.dev. Every tool has a static page at `/<t
 
 ## Check changes
 
+Image tools accept HEIC/HEIF still images, including `.HEIC` files with no browser MIME type. The `heic` Rust decoder is compiled into the existing WASM backend for conversion, resizing, effects, inspection, and image workbench tools. Output remains PNG, JPEG, or WebP; multi-image HEIF files use the primary image. HDR images are reduced to 8-bit pixels without HDR tone mapping.
+
 ```sh
 bun run doctor
 bun run verify
