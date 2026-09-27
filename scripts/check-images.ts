@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { inflateSync } from "node:zlib";
+import { rasterContainer, imageAccept } from "../src/image-formats";
 import init, {
   decode_raster,
   encode_raster,
@@ -151,4 +152,177 @@ await writeFile(
 );
 console.log(
   "Rust raster decode, PNG/JPEG encode, resizing, sprite composition, malformed files, and allocation bounds passed.",
+);
+
+// Exercise the compiled Rust HEVC decoder, including ordinary conversion paths.
+const heic = new Uint8Array(
+  await readFile("scripts/fixtures/heic/rainbow.heic"),
+);
+assert.equal(rasterContainer(heic), "heif");
+assert.ok(imageAccept.includes(".heic") && imageAccept.includes(".heif"));
+const decodedHeic = decode_raster(heic);
+const heicHeader = new DataView(decodedHeic.buffer, decodedHeic.byteOffset);
+assert.equal(heicHeader.getUint32(0, true), 451);
+assert.equal(heicHeader.getUint32(4, true), 461);
+const heicPixels = decodedHeic.slice(8);
+assert.equal(heicPixels.length, 451 * 461 * 4);
+assert.ok(
+  new Set(heicPixels).size > 100,
+  "Decode must produce actual color pixels.",
+);
+const heicPng = encode_raster(451, 461, heicPixels, "png", 80);
+assert.deepEqual(decode_raster(heicPng), decodedHeic);
+const heicJpeg = await loadImage(
+  Buffer.from(encode_raster(451, 461, heicPixels, "jpeg", 90)),
+);
+assert.equal(heicJpeg.width, 451);
+assert.equal(heicJpeg.height, 461);
+assert.equal(
+  resize_raster(451, 461, heicPixels, 45, 46, false, new Uint8Array()).length,
+  8 + 45 * 46 * 4,
+);
+assert.throws(
+  () => decode_raster(heic.slice(0, 40)),
+  /HEIC\/HEIF decoding failed/,
+);
+const oversizedHeic = Buffer.from(heic);
+const ispe = oversizedHeic.indexOf("ispe");
+assert.ok(ispe > 0);
+oversizedHeic.writeUInt32BE(100_000, ispe + 8);
+assert.throws(() => decode_raster(oversizedHeic), /limit|exceed/i);
+const avif = new Uint8Array(await readFile(".astro/wasm-raster-test.avif"));
+assert.equal(rasterContainer(avif), "avif");
+assert.equal(rasterContainer(encodedPng), undefined);
+assert.equal(rasterContainer(heic.slice(0, 12)), undefined);
+console.log(
+  "HEIC WASM decode, PNG/JPEG conversion, resizing, malformed input, limits, and AVIF routing passed.",
+);
+
+// Prefer libheif in CI: Ubuntu's FFmpeg cannot demux item-based HEIC files.
+// Recent FFmpeg is a fallback on hosts without heif-convert. Odd dimensions
+// exercise HEVC padding and the HEIF display-size metadata.
+const heifConvert = process.env.HEIF_CONVERT ?? Bun.which("heif-convert");
+const outputWidth = 65,
+  outputHeight = 49;
+const gradient = new Uint8Array(outputWidth * outputHeight * 4);
+for (let y = 0; y < outputHeight; y++)
+  for (let x = 0; x < outputWidth; x++)
+    gradient.set(
+      [Math.round((x * 255) / 64), Math.round((y * 255) / 48), 100, 255],
+      (y * outputWidth + x) * 4,
+    );
+const qualitySizes: number[] = [];
+for (const [format, quality] of [
+  ["heic", 1],
+  ["heif", 80],
+  ["heic", 100],
+] as const) {
+  const bytes = encode_raster(
+    outputWidth,
+    outputHeight,
+    gradient,
+    format,
+    quality,
+  );
+  assert.equal(rasterContainer(bytes), "heif");
+  const colorProperty = Buffer.from(bytes).indexOf("colrnclx");
+  assert.ok(colorProperty > 0);
+  assert.deepEqual(
+    Array.from(bytes.slice(colorProperty + 8, colorProperty + 15)),
+    [0, 1, 0, 1, 0, 1, 128],
+  );
+  qualitySizes.push(bytes.length);
+  const file = `.astro/encoded-${quality}.${format}`;
+  await writeFile(file, bytes);
+  const reference = Bun.spawn(
+    heifConvert
+      ? [heifConvert, file, `${file}.png`]
+      : [
+          "ffmpeg",
+          "-hide_banner",
+          "-loglevel",
+          "error",
+          // FFmpeg's automatic HEIF crop rounds odd sizes down for 4:2:0.
+          // Convert to RGBA before applying the exact display rectangle.
+          "-apply_cropping",
+          "0",
+          "-i",
+          file,
+          "-vf",
+          // Use the container's BT.709/full-range nclx (checked above); FFmpeg's
+          // raw HEVC decoder otherwise defaults to BT.601 when SPS VUI omits it.
+          `scale=in_color_matrix=bt709:in_range=full,format=rgba,crop=${outputWidth}:${outputHeight}:0:0:exact=1`,
+          "-frames:v",
+          "1",
+          "-f",
+          "rawvideo",
+          "-pix_fmt",
+          "rgba",
+          "pipe:1",
+        ],
+    { stdout: "pipe", stderr: "pipe" },
+  );
+  const [referencePixels, errors, status] = await Promise.all([
+    new Response(reference.stdout).arrayBuffer(),
+    new Response(reference.stderr).text(),
+    reference.exited,
+  ]);
+  assert.equal(status, 0, errors);
+  let rgba: Uint8Array;
+  if (heifConvert) {
+    const image = await loadImage(await readFile(`${file}.png`));
+    assert.equal(image.width, outputWidth);
+    assert.equal(image.height, outputHeight);
+    const canvas = createCanvas(outputWidth, outputHeight);
+    const context = canvas.getContext("2d");
+    context.drawImage(image, 0, 0);
+    rgba = new Uint8Array(
+      context.getImageData(0, 0, outputWidth, outputHeight).data,
+    );
+  } else {
+    rgba = new Uint8Array(referencePixels);
+  }
+  assert.equal(rgba.length, gradient.length);
+  if (quality === 100) {
+    const meanError =
+      rgba.reduce(
+        (sum, value, index) => sum + Math.abs(value - gradient[index]),
+        0,
+      ) / rgba.length;
+    assert.ok(meanError < 5, `HEIC high-quality color error: ${meanError}`);
+  }
+  const decodedOutput = decode_raster(bytes);
+  const outputHeader = new DataView(
+    decodedOutput.buffer,
+    decodedOutput.byteOffset,
+  );
+  assert.equal(outputHeader.getUint32(0, true), outputWidth);
+  assert.equal(outputHeader.getUint32(4, true), outputHeight);
+  assert.equal(decodedOutput.length, 8 + gradient.length);
+}
+assert.ok(
+  qualitySizes[2] > qualitySizes[0],
+  "Higher quality must change the encoded output.",
+);
+for (const [width, height] of [
+  [1, 1],
+  [2, 1],
+  [64, 64],
+]) {
+  const transparent = new Uint8Array(width * height * 4);
+  const bytes = encode_raster(width, height, transparent, "heic", 100);
+  const decoded = decode_raster(bytes);
+  const header = new DataView(decoded.buffer, decoded.byteOffset);
+  assert.equal(header.getUint32(0, true), width);
+  assert.equal(header.getUint32(4, true), height);
+  assert.ok(
+    decoded.slice(8).every((value) => value >= 250),
+    "Transparent pixels must become white.",
+  );
+}
+for (const quality of [0, 101])
+  assert.throws(() => encode_raster(2, 1, raster, "heic", quality), /Quality/);
+assert.throws(() => encode_raster(2, 2, raster, "heif", 80), /RGBA/);
+console.log(
+  `HEIC/HEIF WASM encoding passed ${heifConvert ? "libheif" : "FFmpeg"} decoding, quality, odd/tiny dimensions, white alpha compositing, and validation.`,
 );

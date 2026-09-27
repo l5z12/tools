@@ -87,7 +87,7 @@ jobs:
       - name: Install reference programs
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ffmpeg 7zip 7zip-rar rar
+          sudo apt-get install -y --no-install-recommends ffmpeg libheif-examples libheif-plugin-libde265 7zip 7zip-rar rar
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Cache verified runtime downloads

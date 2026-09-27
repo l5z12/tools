@@ -1,6 +1,7 @@
 ---
 // SPDX-License-Identifier: AGPL-3.0-only
 import { commonTags } from "../ui/directory";
+import { imageAccept } from "../image-formats";
 import { tools, hashtags } from "../lib/catalog";
 import "../styles.css";
 import { contentSecurityPolicy } from "../lib/security";
@@ -328,11 +329,7 @@ const starterTools = starterIds.map((id) => {
               <label for="fallback-file" data-i18n="fallbackImage">
                 Static fallback image (optional)
               </label>
-              <input
-                id="fallback-file"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-              />
+              <input id="fallback-file" type="file" accept={imageAccept} />
               <label for="fallback-color" data-i18n="fallbackBackground">
                 Fallback background
               </label>

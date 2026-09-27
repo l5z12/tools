@@ -35,8 +35,15 @@ export async function encodeRaster(
   image: Raster,
   format = "png",
   quality = 80,
+  options?: SuiteOptions,
 ): Promise<Uint8Array<ArrayBuffer>> {
-  return imageCore({ kind: "encode", ...image, format, quality });
+  return imageCore({
+    kind: "encode",
+    ...image,
+    format,
+    quality,
+    bypassLimits: options?.bypassLimits === true,
+  });
 }
 export async function resizeRaster(
   image: Raster,

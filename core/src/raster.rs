@@ -33,6 +33,27 @@ fn packed(image: RgbaImage) -> Vec<u8> {
 pub fn decode_raster(bytes: &[u8]) -> Result<Vec<u8>, JsValue> {
     (|| -> Result<Vec<u8>, String> {
         crate::limits::check(bytes.len(), 32 * 1024 * 1024, "Image exceeds 32 MiB.")?;
+        // HEIF containers are decoded by pure Rust inside the same WASM module.
+        // The browser routes AVIF to its existing dedicated AV1 WASM codec.
+        if bytes.get(4..8) == Some(b"ftyp") {
+            let mut limits = heic::Limits::default();
+            if !crate::limits::enabled() {
+                limits.max_width = Some(8192);
+                limits.max_height = Some(8192);
+                limits.max_pixels = Some(32_000_000);
+                limits.max_memory_bytes = Some(192 * 1024 * 1024);
+            }
+            let decoded = heic::DecoderConfig::new()
+                .decode_request(bytes)
+                .with_output_layout(heic::PixelLayout::Rgba8)
+                .with_limits(&limits)
+                .decode()
+                .map_err(|e| format!("HEIC/HEIF decoding failed: {e}"))?;
+            check(decoded.width, decoded.height)?;
+            let image = RgbaImage::from_raw(decoded.width, decoded.height, decoded.data)
+                .ok_or("Invalid HEIC/HEIF pixel data.")?;
+            return Ok(packed(image));
+        }
         let mut reader = ImageReader::new(Cursor::new(bytes))
             .with_guessed_format()
             .map_err(|e| e.to_string())?;
@@ -66,6 +87,38 @@ pub fn encode_raster(
         let mut image = pixels(width, height, bytes)?;
         let mut output = Vec::new();
         match format {
+            "heic" | "heif" => {
+                if !(1..=100).contains(&quality) {
+                    return Err("Quality must be 1–100.".into());
+                }
+                // The encoder has no alpha plane. Composite onto white before
+                // converting to standard 8-bit 4:2:0 HEVC for compatibility.
+                let mut rgb = Vec::with_capacity(image.len() / 4 * 3);
+                for pixel in image.pixels() {
+                    for channel in 0..3 {
+                        rgb.push(
+                            ((u32::from(pixel[channel]) * u32::from(pixel[3])
+                                + 255 * (255 - u32::from(pixel[3]))
+                                + 127)
+                                / 255) as u8,
+                        );
+                    }
+                }
+                let mut input = still265::Image::from_rgb8(
+                    &rgb,
+                    width,
+                    height,
+                    still265::ColorSpace::YCbCrBt709,
+                    false,
+                    8,
+                );
+                input.subsample_to_420(1);
+                let encoder = still265::RustStillHevcEncoder::new(still265::Effort::Fast);
+                // Map the UI's increasing quality to HEVC's decreasing QP.
+                let qp = (((100 - u32::from(quality)) * 51 + 49) / 99) as u8;
+                output = still265::encode_heic(input, &encoder, qp, Default::default())
+                    .map_err(|e| format!("HEIC/HEIF encoding failed: {e}"))?;
+            }
             "png" => image::codecs::png::PngEncoder::new(&mut output)
                 .write_image(
                     image.as_raw(),

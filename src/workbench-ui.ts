@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { imageAccept } from "./image-formats";
 import { workbenchTools, workbenchIds } from "./lib/workbench-tools";
 import { suiteCore } from "./workbench-core";
 import {
@@ -144,10 +145,7 @@ export function configureSuite(
     picker.id = "suite-file";
     picker.multiple = !!tool.multiple;
     picker.accept =
-      tool.accept ??
-      (tool.inputMode === "images"
-        ? "image/png,image/jpeg,image/webp,image/gif,image/avif,image/bmp"
-        : "");
+      tool.accept ?? (tool.inputMode === "images" ? imageAccept : "");
     container.append(label, picker);
     const clear = element("button", t("clearFile"));
     clear.type = "button";

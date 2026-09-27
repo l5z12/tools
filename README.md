@@ -24,12 +24,14 @@ The public site is https://tools.l5z12.dev. Every tool has a static page at `/<t
 
 ## Check changes
 
+Image tools accept HEIC/HEIF still images, including `.HEIC` files with no browser MIME type. The `heic` Rust decoder is compiled into the existing WASM backend for conversion, resizing, effects, inspection, and image workbench tools. Image → HEIC and Image → HEIF use the vendored `still265` Rust encoder in that same WASM backend. Both write HEVC-compressed HEIF containers, with the chosen extension and MIME type. Quality 1–100 controls lossy compression; transparent pixels are composited onto white. Previews show the encoded result as PNG, while downloads keep the HEIC/HEIF bytes. PNG, JPEG, and WebP exports remain available. Multi-image HEIF inputs use the primary image. HDR inputs are reduced to 8-bit pixels without HDR tone mapping; output is an 8-bit still image.
+
 ```sh
 bun run doctor
 bun run verify
 ```
 
-`doctor` reports prerequisites. `verify` checks formatting and SPDX headers, prepares assets, checks types, builds the site, and runs all test suites. The reference tests also need Node.js, FFmpeg/ffprobe, 7-Zip, and the RAR command-line tool. Use `SEVENZIP` and `RAR` to specify executable paths when they are outside PATH or their usual Windows installation directories.
+`doctor` reports prerequisites. `verify` checks formatting and SPDX headers, prepares assets, checks types, builds the site, and runs all test suites. The reference tests also need Node.js, FFmpeg/ffprobe, 7-Zip, and the RAR command-line tool. HEIC export checks prefer `heif-convert` from libheif (`libheif-examples` and `libheif-plugin-libde265` on Ubuntu); without it, FFmpeg must support HEIC image containers. Set `HEIF_CONVERT` to specify its executable path. Use `SEVENZIP` and `RAR` to specify executable paths when they are outside PATH or their usual Windows installation directories.
 
 For a focused change, run named suites against prepared assets:
 

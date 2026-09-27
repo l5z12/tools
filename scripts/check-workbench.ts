@@ -535,6 +535,26 @@ Object.assign(globalThis, {
   },
 });
 const { imageSuite } = await import("../src/workbench-images");
+const { processImage } = await import("../src/image-tools");
+const heicFile = new File(
+  [new Uint8Array(await readFile("scripts/fixtures/heic/rainbow.heic"))],
+  "photo.HEIC",
+  { type: "" },
+);
+const heicInspection = await processImage("image-inspect", heicFile, "");
+assert.equal(heicInspection.meta.Width, 451);
+assert.equal(heicInspection.blob, heicFile);
+const heicPreview = await fetch(heicInspection.url);
+assert.equal(heicPreview.headers.get("content-type"), "image/png");
+assert.equal(
+  (await loadImage(Buffer.from(await heicPreview.arrayBuffer()))).width,
+  451,
+);
+URL.revokeObjectURL(heicInspection.url);
+assert.ok(
+  (await imageSuite("palette-extractor", [heicFile], { count: 4 })).colors
+    ?.length,
+);
 const c = createCanvas(2, 2);
 const ctx = c.getContext("2d");
 ctx.fillStyle = "#ff0000";
@@ -542,6 +562,22 @@ ctx.fillRect(0, 0, 2, 2);
 const f = new File([new Uint8Array(c.toBuffer("image/png"))], "red.png", {
   type: "image/png",
 });
+for (const format of ["heic", "heif"]) {
+  const result = await processImage(`image-${format}`, f, "80");
+  assert.equal(result.blob.type, `image/${format}`);
+  assert.equal(result.meta.Width, 2);
+  const preview = await fetch(result.url);
+  assert.equal(preview.headers.get("content-type"), "image/png");
+  assert.equal(
+    (await loadImage(Buffer.from(await preview.arrayBuffer()))).width,
+    2,
+  );
+  assert.notDeepEqual(
+    new Uint8Array(await result.blob.arrayBuffer()).slice(0, 8),
+    new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+  );
+  URL.revokeObjectURL(result.url);
+}
 ctx.fillStyle = "#0000ff";
 ctx.fillRect(0, 0, 2, 2);
 const g = new File([new Uint8Array(c.toBuffer("image/png"))], "blue.png", {

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { imageAccept } from "./image-formats";
 import {
   configureSuite,
   executeSuite,
@@ -298,9 +299,7 @@ function select(id: string): void {
     invalidate();
   };
   $("file-field").hidden = !fileTool(current.id);
-  $("file").accept = current.id.startsWith("image-")
-    ? "image/png,image/jpeg,image/webp,image/gif,image/avif,image/bmp"
-    : "";
+  $("file").accept = current.id.startsWith("image-") ? imageAccept : "";
   $("file").value = "";
   updateFileLimitLabel();
   configureAnimation(current.id);
@@ -550,7 +549,11 @@ $("download").onclick = () => {
         ? "jpg"
         : blob.type === "image/webp"
           ? "webp"
-          : "png";
+          : blob.type === "image/heic"
+            ? "heic"
+            : blob.type === "image/heif"
+              ? "heif"
+              : "png";
   }
   const u = URL.createObjectURL(blob);
   const a = document.createElement("a");

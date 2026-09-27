@@ -29,7 +29,9 @@ export async function processImage(
     };
     return {
       blob: file,
-      url: URL.createObjectURL(file),
+      url: URL.createObjectURL(
+        new Blob([await encodeRaster(image)], { type: "image/png" }),
+      ),
       meta,
       text: JSON.stringify(meta, null, 2),
     };
@@ -93,10 +95,16 @@ export async function processImage(
       );
     }
   }
-  const format =
-    id === "image-jpeg" ? "jpeg" : id === "image-webp" ? "webp" : "png";
+  const format = [
+    "image-jpeg",
+    "image-webp",
+    "image-heic",
+    "image-heif",
+  ].includes(id)
+    ? id.slice(6)
+    : "png";
   const blob = new Blob(
-    [await encodeRaster(image, format, Number(option) || 80)],
+    [await encodeRaster(image, format, Number(option) || 80, limits)],
     { type: `image/${format}` },
   );
   const meta = {
@@ -106,9 +114,19 @@ export async function processImage(
     "Original bytes": file.size,
     "Output bytes": blob.size,
   };
+  let preview = blob;
+  if (format === "heic" || format === "heif") {
+    const decoded = await decodeRaster(
+      new File([blob], `output.${format}`),
+      limits,
+    );
+    preview = new Blob([await encodeRaster(decoded, "png", 80, limits)], {
+      type: "image/png",
+    });
+  }
   return {
     blob,
-    url: URL.createObjectURL(blob),
+    url: URL.createObjectURL(preview),
     meta,
     text: JSON.stringify(meta, null, 2),
   };
