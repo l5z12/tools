@@ -40,7 +40,7 @@ pub(super) struct Encoder<'a> {
     pub(super) ct_depth_stride: usize,
     pub(super) deblock: bool,
     pub(super) sign_data_hiding: bool,
-    pub(super) aq: AqState,
+    aq: AqState,
     pub(super) cur_qp_y: i32,
     pub(super) cur_qp_c: i32,
     /// Resolved adaptive-quantization strategy + strength + clamp for this

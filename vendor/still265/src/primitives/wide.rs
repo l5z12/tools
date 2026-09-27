@@ -126,7 +126,7 @@ pub fn quantize(coeffs: &[i16], levels: &mut [i16], scale: i32, add: i32, qbits:
         let level = ((absc * vscale + vadd) >> qbits).min(vmax);
         // Re-sign: -level where c<0, level otherwise.
         let neg = c.is_negative();
-        let signed = neg.blend(zero - level, level);
+        let signed = neg.select(zero - level, level);
         let arr = signed.to_array();
         for (k, &x) in arr.iter().enumerate() {
             levels[i + k] = x as i16;
@@ -246,7 +246,7 @@ pub fn sao_stats_e0(
                 // edge == ev  <=>  (edge-ev) is neither negative nor positive.
                 let dd = edge - cat_vec[k];
                 let mask = !(dd.is_negative() | dd.is_positive());
-                sum_acc[k] = sum_acc[k] + mask.blend(diff, zero);
+                sum_acc[k] = sum_acc[k] + mask.select(diff, zero);
                 cnt_acc[k] = cnt_acc[k] + mask; // adds -1 per matching lane
             }
             xi += 8;

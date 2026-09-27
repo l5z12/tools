@@ -12,6 +12,11 @@
 //! does not encode alpha, lossless HEVC, animation, inter frames, or any
 //! bitrate-targeted rate-control mode.
 
+// Retain upstream decoder metadata, experimental search helpers, and alternate
+// primitives for future vendor updates. They are not all used by this build.
+// Other warning categories remain enabled, including unsafe operations.
+#![allow(dead_code, reason = "vendored upstream includes unused optional codec paths")]
+
 extern crate alloc;
 
 mod clock;

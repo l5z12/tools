@@ -31,7 +31,7 @@ bun run doctor
 bun run verify
 ```
 
-`doctor` reports prerequisites. `verify` checks formatting and SPDX headers, prepares assets, checks types, builds the site, and runs all test suites. The reference tests also need Node.js, FFmpeg/ffprobe, 7-Zip, and the RAR command-line tool. Use `SEVENZIP` and `RAR` to specify executable paths when they are outside PATH or their usual Windows installation directories.
+`doctor` reports prerequisites. `verify` checks formatting and SPDX headers, prepares assets, checks types, builds the site, and runs all test suites. The reference tests also need Node.js, FFmpeg/ffprobe, 7-Zip, and the RAR command-line tool. HEIC export checks prefer `heif-convert` from libheif (`libheif-examples` and `libheif-plugin-libde265` on Ubuntu); without it, FFmpeg must support HEIC image containers. Set `HEIF_CONVERT` to specify its executable path. Use `SEVENZIP` and `RAR` to specify executable paths when they are outside PATH or their usual Windows installation directories.
 
 For a focused change, run named suites against prepared assets:
 

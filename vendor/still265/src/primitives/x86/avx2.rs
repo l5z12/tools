@@ -20,78 +20,80 @@ pub unsafe fn quantize_avx2(
     add: i32,
     qbits: i32,
 ) -> u32 {
-    let n = coeffs.len().min(levels.len());
-    let vscale = _mm256_set1_epi32(scale);
-    let vadd = _mm256_set1_epi32(add);
-    let vmax = _mm256_set1_epi32(32767);
-    let vzero = _mm256_setzero_si256();
-    let vshift = _mm256_set1_epi32(qbits);
-    let mut nnz = 0u32;
+    unsafe {
+        let n = coeffs.len().min(levels.len());
+        let vscale = _mm256_set1_epi32(scale);
+        let vadd = _mm256_set1_epi32(add);
+        let vmax = _mm256_set1_epi32(32767);
+        let vzero = _mm256_setzero_si256();
+        let vshift = _mm256_set1_epi32(qbits);
+        let mut nnz = 0u32;
 
-    let mut i = 0;
-    while i + 16 <= n {
-        // Load 16 i16 coefficients.
-        let raw = _mm256_loadu_si256(coeffs.as_ptr().add(i) as *const __m256i);
+        let mut i = 0;
+        while i + 16 <= n {
+            // Load 16 i16 coefficients.
+            let raw = _mm256_loadu_si256(coeffs.as_ptr().add(i) as *const __m256i);
 
-        // Widen each 8-lane half to i32.
-        let lo_i32 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(raw));
-        let hi_i32 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256(raw, 1));
+            // Widen each 8-lane half to i32.
+            let lo_i32 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(raw));
+            let hi_i32 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256(raw, 1));
 
-        // |coeff|
-        let lo_abs = _mm256_abs_epi32(lo_i32);
-        let hi_abs = _mm256_abs_epi32(hi_i32);
+            // |coeff|
+            let lo_abs = _mm256_abs_epi32(lo_i32);
+            let hi_abs = _mm256_abs_epi32(hi_i32);
 
-        // level = (|coeff| * scale + add) >> qbits
-        let lo_lvl = _mm256_srav_epi32(
-            _mm256_add_epi32(_mm256_mullo_epi32(lo_abs, vscale), vadd),
-            vshift,
-        );
-        let hi_lvl = _mm256_srav_epi32(
-            _mm256_add_epi32(_mm256_mullo_epi32(hi_abs, vscale), vadd),
-            vshift,
-        );
+            // level = (|coeff| * scale + add) >> qbits
+            let lo_lvl = _mm256_srav_epi32(
+                _mm256_add_epi32(_mm256_mullo_epi32(lo_abs, vscale), vadd),
+                vshift,
+            );
+            let hi_lvl = _mm256_srav_epi32(
+                _mm256_add_epi32(_mm256_mullo_epi32(hi_abs, vscale), vadd),
+                vshift,
+            );
 
-        // clamp to 32767
-        let lo_lvl = _mm256_min_epi32(lo_lvl, vmax);
-        let hi_lvl = _mm256_min_epi32(hi_lvl, vmax);
+            // clamp to 32767
+            let lo_lvl = _mm256_min_epi32(lo_lvl, vmax);
+            let hi_lvl = _mm256_min_epi32(hi_lvl, vmax);
 
-        // Re-sign: negate where original coeff < 0.
-        let lo_neg = _mm256_cmpgt_epi32(vzero, lo_i32);
-        let hi_neg = _mm256_cmpgt_epi32(vzero, hi_i32);
-        let lo_s = _mm256_blendv_epi8(lo_lvl, _mm256_sub_epi32(vzero, lo_lvl), lo_neg);
-        let hi_s = _mm256_blendv_epi8(hi_lvl, _mm256_sub_epi32(vzero, hi_lvl), hi_neg);
+            // Re-sign: negate where original coeff < 0.
+            let lo_neg = _mm256_cmpgt_epi32(vzero, lo_i32);
+            let hi_neg = _mm256_cmpgt_epi32(vzero, hi_i32);
+            let lo_s = _mm256_blendv_epi8(lo_lvl, _mm256_sub_epi32(vzero, lo_lvl), lo_neg);
+            let hi_s = _mm256_blendv_epi8(hi_lvl, _mm256_sub_epi32(vzero, hi_lvl), hi_neg);
 
-        // Pack two i32x8 → i16x16.
-        // _mm256_packs_epi32 interleaves 128-bit halves, so permute to fix order:
-        // before: [lo[0..3], hi[0..3], lo[4..7], hi[4..7]]
-        // after : [lo[0..7], hi[0..7]]   (imm8 = 0b11_01_10_00 = 0xD8)
-        let packed = _mm256_packs_epi32(lo_s, hi_s);
-        let fixed = _mm256_permute4x64_epi64(packed, 0xD8);
+            // Pack two i32x8 → i16x16.
+            // _mm256_packs_epi32 interleaves 128-bit halves, so permute to fix order:
+            // before: [lo[0..3], hi[0..3], lo[4..7], hi[4..7]]
+            // after : [lo[0..7], hi[0..7]]   (imm8 = 0b11_01_10_00 = 0xD8)
+            let packed = _mm256_packs_epi32(lo_s, hi_s);
+            let fixed = _mm256_permute4x64_epi64(packed, 0xD8);
 
-        _mm256_storeu_si256(levels.as_mut_ptr().add(i) as *mut __m256i, fixed);
+            _mm256_storeu_si256(levels.as_mut_ptr().add(i) as *mut __m256i, fixed);
 
-        // Count non-zeros: cmpeq returns 0xFFFF per zero lane; movemask sees MSBs.
-        // A zero i16 contributes 2 set bits; count_ones()/2 = zero count.
-        let zeromask = _mm256_movemask_epi8(_mm256_cmpeq_epi16(fixed, vzero));
-        nnz += 16 - (zeromask.count_ones() >> 1);
+            // Count non-zeros: cmpeq returns 0xFFFF per zero lane; movemask sees MSBs.
+            // A zero i16 contributes 2 set bits; count_ones()/2 = zero count.
+            let zeromask = _mm256_movemask_epi8(_mm256_cmpeq_epi16(fixed, vzero));
+            nnz += 16 - (zeromask.count_ones() >> 1);
 
-        i += 16;
-    }
-
-    // Scalar tail.
-    while i < n {
-        let c = coeffs[i];
-        let level = (c.unsigned_abs() as i64 * scale as i64 + add as i64) >> qbits;
-        let level = level.min(32767) as i32;
-        if level != 0 {
-            levels[i] = if c < 0 { -level } else { level } as i16;
-            nnz += 1;
-        } else {
-            levels[i] = 0;
+            i += 16;
         }
-        i += 1;
+
+        // Scalar tail.
+        while i < n {
+            let c = coeffs[i];
+            let level = (c.unsigned_abs() as i64 * scale as i64 + add as i64) >> qbits;
+            let level = level.min(32767) as i32;
+            if level != 0 {
+                levels[i] = if c < 0 { -level } else { level } as i16;
+                nnz += 1;
+            } else {
+                levels[i] = 0;
+            }
+            i += 1;
+        }
+        nnz
     }
-    nnz
 }
 
 pub fn quantize_avx2_dispatch(
@@ -115,42 +117,45 @@ pub unsafe fn ssd_u8_avx2(
     stride_b: usize,
     size: usize,
 ) -> u64 {
-    let mut sse = 0u64;
-    let zero = _mm256_setzero_si256();
+    unsafe {
+        let mut sse = 0u64;
 
-    for j in 0..size {
-        let ra = &a[j * stride_a..];
-        let rb = &b[j * stride_b..];
-        let mut acc = _mm256_setzero_si256();
-        let mut i = 0;
+        for j in 0..size {
+            let ra = &a[j * stride_a..];
+            let rb = &b[j * stride_b..];
+            let mut acc = _mm256_setzero_si256();
+            let mut i = 0;
 
-        while i + 16 <= size {
-            // Load 16 bytes, zero-extend to i16 via 128-bit load + _mm256_cvtepu8_epi16.
-            let va16 = _mm256_cvtepu8_epi16(_mm_loadu_si128(ra[i..].as_ptr() as *const __m128i));
-            let vb16 = _mm256_cvtepu8_epi16(_mm_loadu_si128(rb[i..].as_ptr() as *const __m128i));
-            let d = _mm256_sub_epi16(va16, vb16);
-            // madd_epi16(d, d): multiply adjacent pairs and add → 8 i32 lanes.
-            acc = _mm256_add_epi32(acc, _mm256_madd_epi16(d, d));
-            i += 16;
+            while i + 16 <= size {
+                // Load 16 bytes, zero-extend to i16 via 128-bit load + _mm256_cvtepu8_epi16.
+                let va16 =
+                    _mm256_cvtepu8_epi16(_mm_loadu_si128(ra[i..].as_ptr() as *const __m128i));
+                let vb16 =
+                    _mm256_cvtepu8_epi16(_mm_loadu_si128(rb[i..].as_ptr() as *const __m128i));
+                let d = _mm256_sub_epi16(va16, vb16);
+                // madd_epi16(d, d): multiply adjacent pairs and add → 8 i32 lanes.
+                acc = _mm256_add_epi32(acc, _mm256_madd_epi16(d, d));
+                i += 16;
+            }
+
+            // Horizontal sum of 8 i32 lanes.
+            let sum128 = _mm_add_epi32(
+                _mm256_castsi256_si128(acc),
+                _mm256_extracti128_si256(acc, 1),
+            );
+            let s = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, 0b01_00_11_10));
+            let s = _mm_add_epi32(s, _mm_shuffle_epi32(s, 0b00_00_00_01));
+            sse += _mm_cvtsi128_si32(s) as u64;
+
+            // SSE2 scalar tail (remaining < 16 bytes).
+            while i < size {
+                let d = ra[i] as i32 - rb[i] as i32;
+                sse += (d * d) as u64;
+                i += 1;
+            }
         }
-
-        // Horizontal sum of 8 i32 lanes.
-        let sum128 = _mm_add_epi32(
-            _mm256_castsi256_si128(acc),
-            _mm256_extracti128_si256(acc, 1),
-        );
-        let s = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, 0b01_00_11_10));
-        let s = _mm_add_epi32(s, _mm_shuffle_epi32(s, 0b00_00_00_01));
-        sse += _mm_cvtsi128_si32(s) as u64;
-
-        // SSE2 scalar tail (remaining < 16 bytes).
-        while i < size {
-            let d = ra[i] as i32 - rb[i] as i32;
-            sse += (d * d) as u64;
-            i += 1;
-        }
+        sse
     }
-    sse
 }
 
 pub fn ssd_u8_avx2_dispatch(
@@ -176,21 +181,23 @@ pub unsafe fn sub_residual_u8_avx2(
     out: &mut [i16],
     size: usize,
 ) {
-    for j in 0..size {
-        let rs = &src[j * src_stride..];
-        let rp = &pred[j * pred_stride..];
-        let ro = &mut out[j * size..];
-        let mut i = 0;
-        while i + 16 <= size {
-            let vs = _mm256_cvtepu8_epi16(_mm_loadu_si128(rs[i..].as_ptr() as *const __m128i));
-            let vp = _mm256_cvtepu8_epi16(_mm_loadu_si128(rp[i..].as_ptr() as *const __m128i));
-            let d = _mm256_sub_epi16(vs, vp);
-            _mm256_storeu_si256(ro[i..].as_mut_ptr() as *mut __m256i, d);
-            i += 16;
-        }
-        while i < size {
-            ro[i] = rs[i] as i16 - rp[i] as i16;
-            i += 1;
+    unsafe {
+        for j in 0..size {
+            let rs = &src[j * src_stride..];
+            let rp = &pred[j * pred_stride..];
+            let ro = &mut out[j * size..];
+            let mut i = 0;
+            while i + 16 <= size {
+                let vs = _mm256_cvtepu8_epi16(_mm_loadu_si128(rs[i..].as_ptr() as *const __m128i));
+                let vp = _mm256_cvtepu8_epi16(_mm_loadu_si128(rp[i..].as_ptr() as *const __m128i));
+                let d = _mm256_sub_epi16(vs, vp);
+                _mm256_storeu_si256(ro[i..].as_mut_ptr() as *mut __m256i, d);
+                i += 16;
+            }
+            while i < size {
+                ro[i] = rs[i] as i16 - rp[i] as i16;
+                i += 1;
+            }
         }
     }
 }
@@ -219,27 +226,29 @@ pub fn sub_residual_u8_avx2_dispatch(
 /// exactly.
 #[target_feature(enable = "avx2")]
 pub unsafe fn add_clip_u8_avx2(pred: &[u8], residual: &[i16], out: &mut [u8], n: usize) {
-    debug_assert!(pred.len() >= n && residual.len() >= n && out.len() >= n);
-    let mut i = 0;
-    while i + 16 <= n {
-        // 16 u8 pred → 16 i16, 16 i16 residual, saturating add.
-        let p = _mm256_cvtepu8_epi16(_mm_loadu_si128(pred.as_ptr().add(i) as *const __m128i));
-        let r = _mm256_loadu_si256(residual.as_ptr().add(i) as *const __m256i);
-        let s = _mm256_adds_epi16(p, r);
-        // Pack 16 i16 → 16 u8 (clamps to [0,255]); packus interleaves the two
-        // 128-bit lanes, so permute the qwords back into source order before the
-        // 16-byte store: result low 128 = [lane0.lo, lane1.lo].
-        let packed = _mm256_packus_epi16(s, s);
-        let perm = _mm256_permute4x64_epi64(packed, 0b0000_1000);
-        _mm_storeu_si128(
-            out.as_mut_ptr().add(i) as *mut __m128i,
-            _mm256_castsi256_si128(perm),
-        );
-        i += 16;
-    }
-    while i < n {
-        out[i] = (pred[i] as i32 + residual[i] as i32).clamp(0, 255) as u8;
-        i += 1;
+    unsafe {
+        debug_assert!(pred.len() >= n && residual.len() >= n && out.len() >= n);
+        let mut i = 0;
+        while i + 16 <= n {
+            // 16 u8 pred → 16 i16, 16 i16 residual, saturating add.
+            let p = _mm256_cvtepu8_epi16(_mm_loadu_si128(pred.as_ptr().add(i) as *const __m128i));
+            let r = _mm256_loadu_si256(residual.as_ptr().add(i) as *const __m256i);
+            let s = _mm256_adds_epi16(p, r);
+            // Pack 16 i16 → 16 u8 (clamps to [0,255]); packus interleaves the two
+            // 128-bit lanes, so permute the qwords back into source order before the
+            // 16-byte store: result low 128 = [lane0.lo, lane1.lo].
+            let packed = _mm256_packus_epi16(s, s);
+            let perm = _mm256_permute4x64_epi64(packed, 0b0000_1000);
+            _mm_storeu_si128(
+                out.as_mut_ptr().add(i) as *mut __m128i,
+                _mm256_castsi256_si128(perm),
+            );
+            i += 16;
+        }
+        while i < n {
+            out[i] = (pred[i] as i32 + residual[i] as i32).clamp(0, 255) as u8;
+            i += 1;
+        }
     }
 }
 
@@ -376,7 +385,7 @@ unsafe fn hadamard4_rows(
     r2: __m256i,
     r3: __m256i,
 ) -> (__m256i, __m256i, __m256i, __m256i) {
-    unsafe {
+    {
         let a0 = _mm256_add_epi16(r0, r3);
         let a1 = _mm256_add_epi16(r1, r2);
         let a2 = _mm256_sub_epi16(r1, r2);
@@ -501,7 +510,7 @@ unsafe fn sa8d_8x8_u8_avx2(a: &[u8], sa: usize, b: &[u8], sb: usize) -> u32 {
 #[inline]
 #[target_feature(enable = "avx2")]
 unsafe fn hadamard8_rows_i16(r: &mut [__m128i; 8]) {
-    unsafe {
+    {
         let a0 = _mm_add_epi16(r[0], r[4]);
         let a1 = _mm_add_epi16(r[1], r[5]);
         let a2 = _mm_add_epi16(r[2], r[6]);
@@ -535,7 +544,7 @@ unsafe fn hadamard8_rows_i16(r: &mut [__m128i; 8]) {
 #[inline]
 #[target_feature(enable = "avx2")]
 unsafe fn transpose8x8_i16(r: &mut [__m128i; 8]) {
-    unsafe {
+    {
         let t0 = _mm_unpacklo_epi16(r[0], r[1]);
         let t1 = _mm_unpackhi_epi16(r[0], r[1]);
         let t2 = _mm_unpacklo_epi16(r[2], r[3]);
@@ -600,7 +609,7 @@ unsafe fn pred_planar_u8_avx2(
 ) {
     let n = 1usize << log2_size;
     let shift = (log2_size + 1) as u32;
-    let vshift = unsafe { _mm_cvtsi32_si128(shift as i32) };
+    let vshift = { _mm_cvtsi32_si128(shift as i32) };
 
     let right = border[center + 1 + n];
     let bottom = border[center - 1 - n];
@@ -608,7 +617,7 @@ unsafe fn pred_planar_u8_avx2(
 
     // Lane index vector [0,1,2,3,4,5,6,7] used to compute px offsets within chunks.
     // _mm256_set_epi32(e7,e6,...,e0): lane 0 = e0, lane 7 = e7.
-    let vlane = unsafe { _mm256_set_epi32(7, 6, 5, 4, 3, 2, 1, 0) };
+    let vlane = { _mm256_set_epi32(7, 6, 5, 4, 3, 2, 1, 0) };
 
     for py in 0..n {
         let left_y = border[center - 1 - py];
@@ -616,9 +625,9 @@ unsafe fn pred_planar_u8_avx2(
         let c1 = (n as i32 - 1) * left_y + right + (py as i32 + 1) * bottom + n as i32;
         let c2 = right - left_y;
 
-        let vc1 = unsafe { _mm256_set1_epi32(c1) };
-        let vwy = unsafe { _mm256_set1_epi32(wy) };
-        let vc2 = unsafe { _mm256_set1_epi32(c2) };
+        let vc1 = { _mm256_set1_epi32(c1) };
+        let vwy = { _mm256_set1_epi32(wy) };
+        let vc2 = { _mm256_set1_epi32(c2) };
         let dst_row = &mut dst[py * n..];
 
         let mut px = 0usize;
@@ -626,21 +635,21 @@ unsafe fn pred_planar_u8_avx2(
             // Load top[px..px+8] (8 consecutive i32 values).
             let vtop = unsafe { _mm256_loadu_si256(top_ptr.add(px) as *const __m256i) };
             // Absolute column index for this chunk.
-            let vpx = unsafe { _mm256_add_epi32(vlane, _mm256_set1_epi32(px as i32)) };
+            let vpx = { _mm256_add_epi32(vlane, _mm256_set1_epi32(px as i32)) };
             // sum = wy*top + c1 + px*c2
-            let sum = unsafe {
+            let sum = {
                 _mm256_add_epi32(
                     _mm256_add_epi32(_mm256_mullo_epi32(vwy, vtop), vc1),
                     _mm256_mullo_epi32(vpx, vc2),
                 )
             };
             // Arithmetic right shift by `shift`.
-            let shifted = unsafe { _mm256_sra_epi32(sum, vshift) };
+            let shifted = { _mm256_sra_epi32(sum, vshift) };
             // Pack i32×8 → i16×8 → u8×8 with saturation.
-            let lo128 = unsafe { _mm256_castsi256_si128(shifted) };
-            let hi128 = unsafe { _mm256_extracti128_si256(shifted, 1) };
-            let packed16 = unsafe { _mm_packs_epi32(lo128, hi128) };
-            let packed8 = unsafe { _mm_packus_epi16(packed16, packed16) };
+            let lo128 = { _mm256_castsi256_si128(shifted) };
+            let hi128 = { _mm256_extracti128_si256(shifted, 1) };
+            let packed16 = { _mm_packs_epi32(lo128, hi128) };
+            let packed8 = { _mm_packus_epi16(packed16, packed16) };
             unsafe { _mm_storel_epi64(dst_row.as_mut_ptr().add(px) as *mut __m128i, packed8) };
             px += 8;
         }
@@ -697,18 +706,18 @@ unsafe fn pred_dc_u8_avx2(
         dst[0] = ((left0 + 2 * dc + top0 + 2) >> 2).clamp(0, 255) as u8;
 
         // First row (excluding corner): blend with top
-        let vtop_blend = unsafe { _mm256_set1_epi32((3 * dc + 2) as i32) };
-        let vshift1 = unsafe { _mm_cvtsi32_si128(2) };
+        let vtop_blend = { _mm256_set1_epi32((3 * dc + 2) as i32) };
+        let vshift1 = { _mm_cvtsi32_si128(2) };
         let mut px = 1usize;
         while px + 8 <= n {
             let vtop =
                 unsafe { _mm256_loadu_si256(border[center + 1 + px..].as_ptr() as *const __m256i) };
-            let sum_v = unsafe { _mm256_add_epi32(vtop, vtop_blend) };
-            let shifted = unsafe { _mm256_sra_epi32(sum_v, vshift1) };
-            let lo128 = unsafe { _mm256_castsi256_si128(shifted) };
-            let hi128 = unsafe { _mm256_extracti128_si256(shifted, 1) };
-            let packed16 = unsafe { _mm_packs_epi32(lo128, hi128) };
-            let packed8 = unsafe { _mm_packus_epi16(packed16, packed16) };
+            let sum_v = { _mm256_add_epi32(vtop, vtop_blend) };
+            let shifted = { _mm256_sra_epi32(sum_v, vshift1) };
+            let lo128 = { _mm256_castsi256_si128(shifted) };
+            let hi128 = { _mm256_extracti128_si256(shifted, 1) };
+            let packed16 = { _mm_packs_epi32(lo128, hi128) };
+            let packed8 = { _mm_packus_epi16(packed16, packed16) };
             unsafe { _mm_storel_epi64(dst.as_mut_ptr().add(px) as *mut __m128i, packed8) };
             px += 8;
         }
@@ -718,8 +727,8 @@ unsafe fn pred_dc_u8_avx2(
         }
 
         // Remaining rows: first column blended with left; rest filled with dc_val.
-        let vfill = unsafe { _mm256_set1_epi8(dc_val as i8) };
-        let vfill128 = unsafe { _mm_set1_epi8(dc_val as i8) };
+        let vfill = { _mm256_set1_epi8(dc_val as i8) };
+        let vfill128 = { _mm_set1_epi8(dc_val as i8) };
         for py in 1..n {
             let left_py = border[center - 1 - py] as i32;
             dst[py * n] = ((left_py + 3 * dc + 2) >> 2).clamp(0, 255) as u8;
@@ -741,12 +750,12 @@ unsafe fn pred_dc_u8_avx2(
         let n2 = n * n;
         let mut i = 0;
         while i + 32 <= n2 {
-            let v = unsafe { _mm256_set1_epi8(dc_val as i8) };
+            let v = { _mm256_set1_epi8(dc_val as i8) };
             unsafe { _mm256_storeu_si256(dst.as_mut_ptr().add(i) as *mut __m256i, v) };
             i += 32;
         }
         while i + 16 <= n2 {
-            let v = unsafe { _mm_set1_epi8(dc_val as i8) };
+            let v = { _mm_set1_epi8(dc_val as i8) };
             unsafe { _mm_storeu_si128(dst.as_mut_ptr().add(i) as *mut __m128i, v) };
             i += 16;
         }
@@ -835,8 +844,8 @@ unsafe fn pred_angular_u8_avx2(
                 .copy_from_slice(&border[src_start..src_start + size]);
         }
 
-        let vround = unsafe { _mm256_set1_epi32(16) };
-        let vshift5 = unsafe { _mm_cvtsi32_si128(5) };
+        let vround = { _mm256_set1_epi32(16) };
+        let vshift5 = { _mm_cvtsi32_si128(5) };
 
         for py in 0..n {
             let i_idx = ((py + 1) * intra_pred_angle) >> 5;
@@ -846,8 +855,8 @@ unsafe fn pred_angular_u8_avx2(
 
             if i_fact != 0 {
                 let w0 = 32 - i_fact;
-                let vw0 = unsafe { _mm256_set1_epi32(w0) };
-                let vw1 = unsafe { _mm256_set1_epi32(i_fact) };
+                let vw0 = { _mm256_set1_epi32(w0) };
+                let vw1 = { _mm256_set1_epi32(i_fact) };
                 let mut px = 0usize;
                 while px + 8 <= size {
                     let v0 = unsafe {
@@ -857,7 +866,7 @@ unsafe fn pred_angular_u8_avx2(
                         _mm256_loadu_si256(ref_arr[base_idx + px + 1..].as_ptr() as *const __m256i)
                     };
                     // (w0*v0 + w1*v1 + 16) >> 5
-                    let sum = unsafe {
+                    let sum = {
                         _mm256_add_epi32(
                             _mm256_add_epi32(
                                 _mm256_mullo_epi32(vw0, v0),
@@ -866,11 +875,11 @@ unsafe fn pred_angular_u8_avx2(
                             vround,
                         )
                     };
-                    let shifted = unsafe { _mm256_sra_epi32(sum, vshift5) };
-                    let lo128 = unsafe { _mm256_castsi256_si128(shifted) };
-                    let hi128 = unsafe { _mm256_extracti128_si256(shifted, 1) };
-                    let packed16 = unsafe { _mm_packs_epi32(lo128, hi128) };
-                    let packed8 = unsafe { _mm_packus_epi16(packed16, packed16) };
+                    let shifted = { _mm256_sra_epi32(sum, vshift5) };
+                    let lo128 = { _mm256_castsi256_si128(shifted) };
+                    let hi128 = { _mm256_extracti128_si256(shifted, 1) };
+                    let packed16 = { _mm_packs_epi32(lo128, hi128) };
+                    let packed8 = { _mm_packus_epi16(packed16, packed16) };
                     unsafe { _mm_storel_epi64(row.as_mut_ptr().add(px) as *mut __m128i, packed8) };
                     px += 8;
                 }
@@ -886,10 +895,10 @@ unsafe fn pred_angular_u8_avx2(
                     let v0 = unsafe {
                         _mm256_loadu_si256(ref_arr[base_idx + px..].as_ptr() as *const __m256i)
                     };
-                    let lo128 = unsafe { _mm256_castsi256_si128(v0) };
-                    let hi128 = unsafe { _mm256_extracti128_si256(v0, 1) };
-                    let packed16 = unsafe { _mm_packs_epi32(lo128, hi128) };
-                    let packed8 = unsafe { _mm_packus_epi16(packed16, packed16) };
+                    let lo128 = { _mm256_castsi256_si128(v0) };
+                    let hi128 = { _mm256_extracti128_si256(v0, 1) };
+                    let packed16 = { _mm_packs_epi32(lo128, hi128) };
+                    let packed8 = { _mm_packus_epi16(packed16, packed16) };
                     unsafe { _mm_storel_epi64(row.as_mut_ptr().add(px) as *mut __m128i, packed8) };
                     px += 8;
                 }
@@ -940,8 +949,8 @@ unsafe fn pred_angular_u8_avx2(
             col_fact[px] = ((px as i32 + 1) * intra_pred_angle) & 31;
         }
 
-        let vround = unsafe { _mm256_set1_epi32(16) };
-        let vshift5 = unsafe { _mm_cvtsi32_si128(5) };
+        let vround = { _mm256_set1_epi32(16) };
+        let vshift5 = { _mm_cvtsi32_si128(5) };
 
         for py in 0..n {
             let row_base = (ref_center as i32 + py + 1) as usize;
@@ -953,15 +962,15 @@ unsafe fn pred_angular_u8_avx2(
                 // Gather: for each of 8 columns, load ref_arr[row_base + col_idx[px+k]].
                 // scale=4 because ref_arr elements are i32 (4 bytes each).
                 let vidx0 = unsafe { _mm256_loadu_si256(col_idx[px..].as_ptr() as *const __m256i) };
-                let vidx1 = unsafe { _mm256_add_epi32(vidx0, _mm256_set1_epi32(1)) };
+                let vidx1 = { _mm256_add_epi32(vidx0, _mm256_set1_epi32(1)) };
                 let v0 = unsafe { _mm256_i32gather_epi32::<4>(ref_base_ptr, vidx0) };
                 let v1 = unsafe { _mm256_i32gather_epi32::<4>(ref_base_ptr, vidx1) };
                 let vfact =
                     unsafe { _mm256_loadu_si256(col_fact[px..].as_ptr() as *const __m256i) };
-                let vw0 = unsafe { _mm256_sub_epi32(_mm256_set1_epi32(32), vfact) };
+                let vw0 = { _mm256_sub_epi32(_mm256_set1_epi32(32), vfact) };
 
                 // Blend: when i_fact == 0, w0*v0 + 0*v1 = w0*v0 = 32*v0 → >> 5 = v0. Correct.
-                let sum = unsafe {
+                let sum = {
                     _mm256_add_epi32(
                         _mm256_add_epi32(
                             _mm256_mullo_epi32(vw0, v0),
@@ -970,11 +979,11 @@ unsafe fn pred_angular_u8_avx2(
                         vround,
                     )
                 };
-                let shifted = unsafe { _mm256_sra_epi32(sum, vshift5) };
-                let lo128 = unsafe { _mm256_castsi256_si128(shifted) };
-                let hi128 = unsafe { _mm256_extracti128_si256(shifted, 1) };
-                let packed16 = unsafe { _mm_packs_epi32(lo128, hi128) };
-                let packed8 = unsafe { _mm_packus_epi16(packed16, packed16) };
+                let shifted = { _mm256_sra_epi32(sum, vshift5) };
+                let lo128 = { _mm256_castsi256_si128(shifted) };
+                let hi128 = { _mm256_extracti128_si256(shifted, 1) };
+                let packed16 = { _mm_packs_epi32(lo128, hi128) };
+                let packed8 = { _mm_packus_epi16(packed16, packed16) };
                 unsafe { _mm_storel_epi64(row.as_mut_ptr().add(px) as *mut __m128i, packed8) };
                 px += 8;
             }
@@ -1041,43 +1050,47 @@ unsafe fn transpose_8x8_i16(
     __m128i,
     __m128i,
 ) {
-    // Phase 1: interleave adjacent pairs of rows (i16 granularity)
-    let t00 = _mm_unpacklo_epi16(r0, r1);
-    let t01 = _mm_unpackhi_epi16(r0, r1);
-    let t02 = _mm_unpacklo_epi16(r2, r3);
-    let t03 = _mm_unpackhi_epi16(r2, r3);
-    let t04 = _mm_unpacklo_epi16(r4, r5);
-    let t05 = _mm_unpackhi_epi16(r4, r5);
-    let t06 = _mm_unpacklo_epi16(r6, r7);
-    let t07 = _mm_unpackhi_epi16(r6, r7);
-    // Phase 2: interleave groups of 2 (i32 granularity)
-    let t10 = _mm_unpacklo_epi32(t00, t02);
-    let t11 = _mm_unpackhi_epi32(t00, t02);
-    let t12 = _mm_unpacklo_epi32(t01, t03);
-    let t13 = _mm_unpackhi_epi32(t01, t03);
-    let t14 = _mm_unpacklo_epi32(t04, t06);
-    let t15 = _mm_unpackhi_epi32(t04, t06);
-    let t16 = _mm_unpacklo_epi32(t05, t07);
-    let t17 = _mm_unpackhi_epi32(t05, t07);
-    // Phase 3: interleave groups of 4 (i64 granularity) → full columns
-    let c0 = _mm_unpacklo_epi64(t10, t14);
-    let c1 = _mm_unpackhi_epi64(t10, t14);
-    let c2 = _mm_unpacklo_epi64(t11, t15);
-    let c3 = _mm_unpackhi_epi64(t11, t15);
-    let c4 = _mm_unpacklo_epi64(t12, t16);
-    let c5 = _mm_unpackhi_epi64(t12, t16);
-    let c6 = _mm_unpacklo_epi64(t13, t17);
-    let c7 = _mm_unpackhi_epi64(t13, t17);
-    (c0, c1, c2, c3, c4, c5, c6, c7)
+    unsafe {
+        // Phase 1: interleave adjacent pairs of rows (i16 granularity)
+        let t00 = _mm_unpacklo_epi16(r0, r1);
+        let t01 = _mm_unpackhi_epi16(r0, r1);
+        let t02 = _mm_unpacklo_epi16(r2, r3);
+        let t03 = _mm_unpackhi_epi16(r2, r3);
+        let t04 = _mm_unpacklo_epi16(r4, r5);
+        let t05 = _mm_unpackhi_epi16(r4, r5);
+        let t06 = _mm_unpacklo_epi16(r6, r7);
+        let t07 = _mm_unpackhi_epi16(r6, r7);
+        // Phase 2: interleave groups of 2 (i32 granularity)
+        let t10 = _mm_unpacklo_epi32(t00, t02);
+        let t11 = _mm_unpackhi_epi32(t00, t02);
+        let t12 = _mm_unpacklo_epi32(t01, t03);
+        let t13 = _mm_unpackhi_epi32(t01, t03);
+        let t14 = _mm_unpacklo_epi32(t04, t06);
+        let t15 = _mm_unpackhi_epi32(t04, t06);
+        let t16 = _mm_unpacklo_epi32(t05, t07);
+        let t17 = _mm_unpackhi_epi32(t05, t07);
+        // Phase 3: interleave groups of 4 (i64 granularity) → full columns
+        let c0 = _mm_unpacklo_epi64(t10, t14);
+        let c1 = _mm_unpackhi_epi64(t10, t14);
+        let c2 = _mm_unpacklo_epi64(t11, t15);
+        let c3 = _mm_unpackhi_epi64(t11, t15);
+        let c4 = _mm_unpacklo_epi64(t12, t16);
+        let c5 = _mm_unpackhi_epi64(t12, t16);
+        let c6 = _mm_unpacklo_epi64(t13, t17);
+        let c7 = _mm_unpackhi_epi64(t13, t17);
+        (c0, c1, c2, c3, c4, c5, c6, c7)
+    }
 }
 
 /// Pack 8 i32 in a ymm to 8 i16 (saturating) and store at `dst[offset..]`.
 #[inline(always)]
 unsafe fn pack_store_i16(dst: &mut [i16], offset: usize, v: __m256i) {
-    let lo = _mm256_castsi256_si128(v);
-    let hi = _mm256_extracti128_si256(v, 1);
-    let packed = _mm_packs_epi32(lo, hi);
-    _mm_storeu_si128(dst.as_mut_ptr().add(offset) as *mut __m128i, packed);
+    unsafe {
+        let lo = _mm256_castsi256_si128(v);
+        let hi = _mm256_extracti128_si256(v, 1);
+        let packed = _mm_packs_epi32(lo, hi);
+        _mm_storeu_si128(dst.as_mut_ptr().add(offset) as *mut __m128i, packed);
+    }
 }
 
 /// One DCT-8 pass: 8 rows × 8 columns, all 8 rows processed in parallel.
@@ -1086,161 +1099,165 @@ unsafe fn pack_store_i16(dst: &mut [i16], offset: usize, v: __m256i) {
 /// layout (freq*8+j) matching the scalar `butterfly8_1d` output convention.
 #[target_feature(enable = "avx2")]
 unsafe fn dct8_pass_avx2(src: &[i16], dst: &mut [i16], shift: u32) {
-    let round = _mm256_set1_epi32(1i32 << (shift - 1));
-    let vshift = _mm_cvtsi32_si128(shift as i32);
+    unsafe {
+        let round = _mm256_set1_epi32(1i32 << (shift - 1));
+        let vshift = _mm_cvtsi32_si128(shift as i32);
 
-    // Load 8 rows (each 8×i16 = 128 bits)
-    let r0 = _mm_loadu_si128(src.as_ptr().add(0) as *const __m128i);
-    let r1 = _mm_loadu_si128(src.as_ptr().add(8) as *const __m128i);
-    let r2 = _mm_loadu_si128(src.as_ptr().add(16) as *const __m128i);
-    let r3 = _mm_loadu_si128(src.as_ptr().add(24) as *const __m128i);
-    let r4 = _mm_loadu_si128(src.as_ptr().add(32) as *const __m128i);
-    let r5 = _mm_loadu_si128(src.as_ptr().add(40) as *const __m128i);
-    let r6 = _mm_loadu_si128(src.as_ptr().add(48) as *const __m128i);
-    let r7 = _mm_loadu_si128(src.as_ptr().add(56) as *const __m128i);
+        // Load 8 rows (each 8×i16 = 128 bits)
+        let r0 = _mm_loadu_si128(src.as_ptr().add(0) as *const __m128i);
+        let r1 = _mm_loadu_si128(src.as_ptr().add(8) as *const __m128i);
+        let r2 = _mm_loadu_si128(src.as_ptr().add(16) as *const __m128i);
+        let r3 = _mm_loadu_si128(src.as_ptr().add(24) as *const __m128i);
+        let r4 = _mm_loadu_si128(src.as_ptr().add(32) as *const __m128i);
+        let r5 = _mm_loadu_si128(src.as_ptr().add(40) as *const __m128i);
+        let r6 = _mm_loadu_si128(src.as_ptr().add(48) as *const __m128i);
+        let r7 = _mm_loadu_si128(src.as_ptr().add(56) as *const __m128i);
 
-    // Transpose: after this, col_k[j] = src[j*8 + k] (col k across all rows)
-    let (col0_x, col1_x, col2_x, col3_x, col4_x, col5_x, col6_x, col7_x) =
-        transpose_8x8_i16(r0, r1, r2, r3, r4, r5, r6, r7);
+        // Transpose: after this, col_k[j] = src[j*8 + k] (col k across all rows)
+        let (col0_x, col1_x, col2_x, col3_x, col4_x, col5_x, col6_x, col7_x) =
+            transpose_8x8_i16(r0, r1, r2, r3, r4, r5, r6, r7);
 
-    // Sign-extend 8×i16 columns to 8×i32 ymm
-    let c0 = _mm256_cvtepi16_epi32(col0_x);
-    let c7 = _mm256_cvtepi16_epi32(col7_x);
-    let e0 = _mm256_add_epi32(c0, c7);
-    let o0 = _mm256_sub_epi32(c0, c7);
+        // Sign-extend 8×i16 columns to 8×i32 ymm
+        let c0 = _mm256_cvtepi16_epi32(col0_x);
+        let c7 = _mm256_cvtepi16_epi32(col7_x);
+        let e0 = _mm256_add_epi32(c0, c7);
+        let o0 = _mm256_sub_epi32(c0, c7);
 
-    let c1 = _mm256_cvtepi16_epi32(col1_x);
-    let c6 = _mm256_cvtepi16_epi32(col6_x);
-    let e1 = _mm256_add_epi32(c1, c6);
-    let o1 = _mm256_sub_epi32(c1, c6);
+        let c1 = _mm256_cvtepi16_epi32(col1_x);
+        let c6 = _mm256_cvtepi16_epi32(col6_x);
+        let e1 = _mm256_add_epi32(c1, c6);
+        let o1 = _mm256_sub_epi32(c1, c6);
 
-    let c2 = _mm256_cvtepi16_epi32(col2_x);
-    let c5 = _mm256_cvtepi16_epi32(col5_x);
-    let e2 = _mm256_add_epi32(c2, c5);
-    let o2 = _mm256_sub_epi32(c2, c5);
+        let c2 = _mm256_cvtepi16_epi32(col2_x);
+        let c5 = _mm256_cvtepi16_epi32(col5_x);
+        let e2 = _mm256_add_epi32(c2, c5);
+        let o2 = _mm256_sub_epi32(c2, c5);
 
-    let c3 = _mm256_cvtepi16_epi32(col3_x);
-    let c4 = _mm256_cvtepi16_epi32(col4_x);
-    let e3 = _mm256_add_epi32(c3, c4);
-    let o3 = _mm256_sub_epi32(c3, c4);
+        let c3 = _mm256_cvtepi16_epi32(col3_x);
+        let c4 = _mm256_cvtepi16_epi32(col4_x);
+        let e3 = _mm256_add_epi32(c3, c4);
+        let o3 = _mm256_sub_epi32(c3, c4);
 
-    // EE / EO sub-butterfly
-    let ee0 = _mm256_add_epi32(e0, e3);
-    let eo0 = _mm256_sub_epi32(e0, e3);
-    let ee1 = _mm256_add_epi32(e1, e2);
-    let eo1 = _mm256_sub_epi32(e1, e2);
+        // EE / EO sub-butterfly
+        let ee0 = _mm256_add_epi32(e0, e3);
+        let eo0 = _mm256_sub_epi32(e0, e3);
+        let ee1 = _mm256_add_epi32(e1, e2);
+        let eo1 = _mm256_sub_epi32(e1, e2);
 
-    // Output freq 0: 64*(ee0+ee1) >> shift  (shift-left-6 = mul-64)
-    let out0 = _mm256_sra_epi32(
-        _mm256_add_epi32(_mm256_slli_epi32(_mm256_add_epi32(ee0, ee1), 6), round),
-        vshift,
-    );
-    // Output freq 4: 64*(ee0-ee1) >> shift
-    let out4 = _mm256_sra_epi32(
-        _mm256_add_epi32(_mm256_slli_epi32(_mm256_sub_epi32(ee0, ee1), 6), round),
-        vshift,
-    );
-    // Output freq 2: (83*eo0 + 36*eo1 + round) >> shift
-    let v83 = _mm256_set1_epi32(83);
-    let v36 = _mm256_set1_epi32(36);
-    let out2 = _mm256_sra_epi32(
-        _mm256_add_epi32(
-            _mm256_add_epi32(_mm256_mullo_epi32(v83, eo0), _mm256_mullo_epi32(v36, eo1)),
-            round,
-        ),
-        vshift,
-    );
-    // Output freq 6: (36*eo0 - 83*eo1 + round) >> shift
-    let out6 = _mm256_sra_epi32(
-        _mm256_add_epi32(
-            _mm256_sub_epi32(_mm256_mullo_epi32(v36, eo0), _mm256_mullo_epi32(v83, eo1)),
-            round,
-        ),
-        vshift,
-    );
+        // Output freq 0: 64*(ee0+ee1) >> shift  (shift-left-6 = mul-64)
+        let out0 = _mm256_sra_epi32(
+            _mm256_add_epi32(_mm256_slli_epi32(_mm256_add_epi32(ee0, ee1), 6), round),
+            vshift,
+        );
+        // Output freq 4: 64*(ee0-ee1) >> shift
+        let out4 = _mm256_sra_epi32(
+            _mm256_add_epi32(_mm256_slli_epi32(_mm256_sub_epi32(ee0, ee1), 6), round),
+            vshift,
+        );
+        // Output freq 2: (83*eo0 + 36*eo1 + round) >> shift
+        let v83 = _mm256_set1_epi32(83);
+        let v36 = _mm256_set1_epi32(36);
+        let out2 = _mm256_sra_epi32(
+            _mm256_add_epi32(
+                _mm256_add_epi32(_mm256_mullo_epi32(v83, eo0), _mm256_mullo_epi32(v36, eo1)),
+                round,
+            ),
+            vshift,
+        );
+        // Output freq 6: (36*eo0 - 83*eo1 + round) >> shift
+        let out6 = _mm256_sra_epi32(
+            _mm256_add_epi32(
+                _mm256_sub_epi32(_mm256_mullo_epi32(v36, eo0), _mm256_mullo_epi32(v83, eo1)),
+                round,
+            ),
+            vshift,
+        );
 
-    // Odd outputs: coefficients from HEVC DCT-8 table
-    let v89 = _mm256_set1_epi32(89);
-    let v75 = _mm256_set1_epi32(75);
-    let v50 = _mm256_set1_epi32(50);
-    let v18 = _mm256_set1_epi32(18);
+        // Odd outputs: coefficients from HEVC DCT-8 table
+        let v89 = _mm256_set1_epi32(89);
+        let v75 = _mm256_set1_epi32(75);
+        let v50 = _mm256_set1_epi32(50);
+        let v18 = _mm256_set1_epi32(18);
 
-    // out1 = 89*o0 + 75*o1 + 50*o2 + 18*o3
-    let out1 = _mm256_sra_epi32(
-        _mm256_add_epi32(
+        // out1 = 89*o0 + 75*o1 + 50*o2 + 18*o3
+        let out1 = _mm256_sra_epi32(
             _mm256_add_epi32(
                 _mm256_add_epi32(
-                    _mm256_add_epi32(_mm256_mullo_epi32(v89, o0), _mm256_mullo_epi32(v75, o1)),
-                    _mm256_mullo_epi32(v50, o2),
+                    _mm256_add_epi32(
+                        _mm256_add_epi32(_mm256_mullo_epi32(v89, o0), _mm256_mullo_epi32(v75, o1)),
+                        _mm256_mullo_epi32(v50, o2),
+                    ),
+                    _mm256_mullo_epi32(v18, o3),
                 ),
-                _mm256_mullo_epi32(v18, o3),
+                round,
             ),
-            round,
-        ),
-        vshift,
-    );
-    // out3 = 75*o0 - 18*o1 - 89*o2 - 50*o3
-    let out3 = _mm256_sra_epi32(
-        _mm256_add_epi32(
-            _mm256_sub_epi32(
+            vshift,
+        );
+        // out3 = 75*o0 - 18*o1 - 89*o2 - 50*o3
+        let out3 = _mm256_sra_epi32(
+            _mm256_add_epi32(
                 _mm256_sub_epi32(
-                    _mm256_sub_epi32(_mm256_mullo_epi32(v75, o0), _mm256_mullo_epi32(v18, o1)),
-                    _mm256_mullo_epi32(v89, o2),
+                    _mm256_sub_epi32(
+                        _mm256_sub_epi32(_mm256_mullo_epi32(v75, o0), _mm256_mullo_epi32(v18, o1)),
+                        _mm256_mullo_epi32(v89, o2),
+                    ),
+                    _mm256_mullo_epi32(v50, o3),
                 ),
-                _mm256_mullo_epi32(v50, o3),
+                round,
             ),
-            round,
-        ),
-        vshift,
-    );
-    // out5 = 50*o0 - 89*o1 + 18*o2 + 75*o3
-    let out5 = _mm256_sra_epi32(
-        _mm256_add_epi32(
+            vshift,
+        );
+        // out5 = 50*o0 - 89*o1 + 18*o2 + 75*o3
+        let out5 = _mm256_sra_epi32(
             _mm256_add_epi32(
                 _mm256_add_epi32(
-                    _mm256_sub_epi32(_mm256_mullo_epi32(v50, o0), _mm256_mullo_epi32(v89, o1)),
-                    _mm256_mullo_epi32(v18, o2),
+                    _mm256_add_epi32(
+                        _mm256_sub_epi32(_mm256_mullo_epi32(v50, o0), _mm256_mullo_epi32(v89, o1)),
+                        _mm256_mullo_epi32(v18, o2),
+                    ),
+                    _mm256_mullo_epi32(v75, o3),
                 ),
-                _mm256_mullo_epi32(v75, o3),
+                round,
             ),
-            round,
-        ),
-        vshift,
-    );
-    // out7 = 18*o0 - 50*o1 + 75*o2 - 89*o3
-    let out7 = _mm256_sra_epi32(
-        _mm256_add_epi32(
-            _mm256_sub_epi32(
-                _mm256_add_epi32(
-                    _mm256_sub_epi32(_mm256_mullo_epi32(v18, o0), _mm256_mullo_epi32(v50, o1)),
-                    _mm256_mullo_epi32(v75, o2),
+            vshift,
+        );
+        // out7 = 18*o0 - 50*o1 + 75*o2 - 89*o3
+        let out7 = _mm256_sra_epi32(
+            _mm256_add_epi32(
+                _mm256_sub_epi32(
+                    _mm256_add_epi32(
+                        _mm256_sub_epi32(_mm256_mullo_epi32(v18, o0), _mm256_mullo_epi32(v50, o1)),
+                        _mm256_mullo_epi32(v75, o2),
+                    ),
+                    _mm256_mullo_epi32(v89, o3),
                 ),
-                _mm256_mullo_epi32(v89, o3),
+                round,
             ),
-            round,
-        ),
-        vshift,
-    );
+            vshift,
+        );
 
-    // Pack each output ymm (8×i32) to 8 i16 (saturating) and store.
-    // dst[freq*8 .. freq*8+8] matches the scalar butterfly8_1d layout.
-    pack_store_i16(dst, 0, out0);
-    pack_store_i16(dst, 8, out1);
-    pack_store_i16(dst, 16, out2);
-    pack_store_i16(dst, 24, out3);
-    pack_store_i16(dst, 32, out4);
-    pack_store_i16(dst, 40, out5);
-    pack_store_i16(dst, 48, out6);
-    pack_store_i16(dst, 56, out7);
+        // Pack each output ymm (8×i32) to 8 i16 (saturating) and store.
+        // dst[freq*8 .. freq*8+8] matches the scalar butterfly8_1d layout.
+        pack_store_i16(dst, 0, out0);
+        pack_store_i16(dst, 8, out1);
+        pack_store_i16(dst, 16, out2);
+        pack_store_i16(dst, 24, out3);
+        pack_store_i16(dst, 32, out4);
+        pack_store_i16(dst, 40, out5);
+        pack_store_i16(dst, 48, out6);
+        pack_store_i16(dst, 56, out7);
+    }
 }
 
 /// 2-D forward DCT-8 using AVX2. Bit-identical to `fwd_dct8_butterfly`.
 #[target_feature(enable = "avx2")]
 unsafe fn fwd_dct8_avx2_inner(residual: &[i16], out: &mut [i16], bit_depth: u8) {
-    let shift1 = (2u32 + bit_depth as u32).saturating_sub(8);
-    let mut tmp = [0i16; 64];
-    dct8_pass_avx2(residual, &mut tmp, shift1);
-    dct8_pass_avx2(&tmp, out, 9);
+    unsafe {
+        let shift1 = (2u32 + bit_depth as u32).saturating_sub(8);
+        let mut tmp = [0i16; 64];
+        dct8_pass_avx2(residual, &mut tmp, shift1);
+        dct8_pass_avx2(&tmp, out, 9);
+    }
 }
 
 pub fn fwd_dct8_avx2_dispatch(residual: &[i16], out: &mut [i16], bit_depth: u8) {
@@ -1256,12 +1273,14 @@ pub fn fwd_dct8_avx2_dispatch(residual: &[i16], out: &mut [i16], bit_depth: u8) 
 /// Horizontal sum of 8 × i32 lanes in a ymm register.
 #[inline(always)]
 unsafe fn hsum8_i32(v: __m256i) -> i32 {
-    let hi = _mm256_extracti128_si256(v, 1);
-    let lo = _mm256_castsi256_si128(v);
-    let sum4 = _mm_add_epi32(lo, hi);
-    let sum2 = _mm_add_epi32(sum4, _mm_srli_si128(sum4, 8));
-    let sum1 = _mm_add_epi32(sum2, _mm_srli_si128(sum2, 4));
-    _mm_cvtsi128_si32(sum1)
+    unsafe {
+        let hi = _mm256_extracti128_si256(v, 1);
+        let lo = _mm256_castsi256_si128(v);
+        let sum4 = _mm_add_epi32(lo, hi);
+        let sum2 = _mm_add_epi32(sum4, _mm_srli_si128(sum4, 8));
+        let sum1 = _mm_add_epi32(sum2, _mm_srli_si128(sum2, 4));
+        _mm_cvtsi128_si32(sum1)
+    }
 }
 
 // DCT-16 O-term coefficient rows (8 coefficients each, 8 odd output freqs).
@@ -1347,54 +1366,56 @@ const DCT32_EEO_AVX2: [[i32; 4]; 4] = [
 /// AVX2 for the 8 O-term dot8 products.
 #[target_feature(enable = "avx2")]
 unsafe fn dct16_pass_avx2(src: &[i16], dst: &mut [i16], line: usize, shift: i32) {
-    let rs = |v: i32| super::super::round_shift(v, shift);
-    for j in 0..line {
-        let s = &src[j * 16..j * 16 + 16];
-        let e0 = s[0] as i32 + s[15] as i32;
-        let o0 = s[0] as i32 - s[15] as i32;
-        let e1 = s[1] as i32 + s[14] as i32;
-        let o1 = s[1] as i32 - s[14] as i32;
-        let e2 = s[2] as i32 + s[13] as i32;
-        let o2 = s[2] as i32 - s[13] as i32;
-        let e3 = s[3] as i32 + s[12] as i32;
-        let o3 = s[3] as i32 - s[12] as i32;
-        let e4 = s[4] as i32 + s[11] as i32;
-        let o4 = s[4] as i32 - s[11] as i32;
-        let e5 = s[5] as i32 + s[10] as i32;
-        let o5 = s[5] as i32 - s[10] as i32;
-        let e6 = s[6] as i32 + s[9] as i32;
-        let o6 = s[6] as i32 - s[9] as i32;
-        let e7 = s[7] as i32 + s[8] as i32;
-        let o7 = s[7] as i32 - s[8] as i32;
-        let ee0 = e0 + e7;
-        let ee1 = e1 + e6;
-        let ee2 = e2 + e5;
-        let ee3 = e3 + e4;
-        let eo0 = e0 - e7;
-        let eo1 = e1 - e6;
-        let eo2 = e2 - e5;
-        let eo3 = e3 - e4;
-        let eee0 = ee0 + ee3;
-        let eee1 = ee1 + ee2;
-        let eeo0 = ee0 - ee3;
-        let eeo1 = ee1 - ee2;
-        // EEE → freqs 0,8
-        dst[0 * line + j] = rs(64 * eee0 + 64 * eee1);
-        dst[8 * line + j] = rs(64 * eee0 - 64 * eee1);
-        // EEO → freqs 4,12
-        dst[4 * line + j] = rs(83 * eeo0 + 36 * eeo1);
-        dst[12 * line + j] = rs(36 * eeo0 - 83 * eeo1);
-        // EO → freqs 2,6,10,14 (dot4, scalar)
-        dst[2 * line + j] = rs(89 * eo0 + 75 * eo1 + 50 * eo2 + 18 * eo3);
-        dst[6 * line + j] = rs(75 * eo0 - 18 * eo1 - 89 * eo2 - 50 * eo3);
-        dst[10 * line + j] = rs(50 * eo0 - 89 * eo1 + 18 * eo2 + 75 * eo3);
-        dst[14 * line + j] = rs(18 * eo0 - 50 * eo1 + 75 * eo2 - 89 * eo3);
-        // O → freqs 1,3,5,7,9,11,13,15 (8 × dot8 with AVX2)
-        let o_ymm = _mm256_set_epi32(o7, o6, o5, o4, o3, o2, o1, o0);
-        for (k, coeff) in DCT16_O.iter().enumerate() {
-            let c = _mm256_loadu_si256(coeff.as_ptr() as *const __m256i);
-            let dot = hsum8_i32(_mm256_mullo_epi32(o_ymm, c));
-            dst[(2 * k + 1) * line + j] = rs(dot);
+    unsafe {
+        let rs = |v: i32| super::super::round_shift(v, shift);
+        for j in 0..line {
+            let s = &src[j * 16..j * 16 + 16];
+            let e0 = s[0] as i32 + s[15] as i32;
+            let o0 = s[0] as i32 - s[15] as i32;
+            let e1 = s[1] as i32 + s[14] as i32;
+            let o1 = s[1] as i32 - s[14] as i32;
+            let e2 = s[2] as i32 + s[13] as i32;
+            let o2 = s[2] as i32 - s[13] as i32;
+            let e3 = s[3] as i32 + s[12] as i32;
+            let o3 = s[3] as i32 - s[12] as i32;
+            let e4 = s[4] as i32 + s[11] as i32;
+            let o4 = s[4] as i32 - s[11] as i32;
+            let e5 = s[5] as i32 + s[10] as i32;
+            let o5 = s[5] as i32 - s[10] as i32;
+            let e6 = s[6] as i32 + s[9] as i32;
+            let o6 = s[6] as i32 - s[9] as i32;
+            let e7 = s[7] as i32 + s[8] as i32;
+            let o7 = s[7] as i32 - s[8] as i32;
+            let ee0 = e0 + e7;
+            let ee1 = e1 + e6;
+            let ee2 = e2 + e5;
+            let ee3 = e3 + e4;
+            let eo0 = e0 - e7;
+            let eo1 = e1 - e6;
+            let eo2 = e2 - e5;
+            let eo3 = e3 - e4;
+            let eee0 = ee0 + ee3;
+            let eee1 = ee1 + ee2;
+            let eeo0 = ee0 - ee3;
+            let eeo1 = ee1 - ee2;
+            // EEE → freqs 0,8
+            dst[0 * line + j] = rs(64 * eee0 + 64 * eee1);
+            dst[8 * line + j] = rs(64 * eee0 - 64 * eee1);
+            // EEO → freqs 4,12
+            dst[4 * line + j] = rs(83 * eeo0 + 36 * eeo1);
+            dst[12 * line + j] = rs(36 * eeo0 - 83 * eeo1);
+            // EO → freqs 2,6,10,14 (dot4, scalar)
+            dst[2 * line + j] = rs(89 * eo0 + 75 * eo1 + 50 * eo2 + 18 * eo3);
+            dst[6 * line + j] = rs(75 * eo0 - 18 * eo1 - 89 * eo2 - 50 * eo3);
+            dst[10 * line + j] = rs(50 * eo0 - 89 * eo1 + 18 * eo2 + 75 * eo3);
+            dst[14 * line + j] = rs(18 * eo0 - 50 * eo1 + 75 * eo2 - 89 * eo3);
+            // O → freqs 1,3,5,7,9,11,13,15 (8 × dot8 with AVX2)
+            let o_ymm = _mm256_set_epi32(o7, o6, o5, o4, o3, o2, o1, o0);
+            for (k, coeff) in DCT16_O.iter().enumerate() {
+                let c = _mm256_loadu_si256(coeff.as_ptr() as *const __m256i);
+                let dot = hsum8_i32(_mm256_mullo_epi32(o_ymm, c));
+                dst[(2 * k + 1) * line + j] = rs(dot);
+            }
         }
     }
 }
@@ -1402,10 +1423,12 @@ unsafe fn dct16_pass_avx2(src: &[i16], dst: &mut [i16], line: usize, shift: i32)
 /// 2-D forward DCT-16 using AVX2 O-term dot products.
 #[target_feature(enable = "avx2")]
 unsafe fn fwd_dct16_avx2_inner(residual: &[i16], out: &mut [i16], bit_depth: u8) {
-    let shift1 = 3i32 + bit_depth as i32 - 8;
-    let mut tmp = [0i16; 256];
-    dct16_pass_avx2(residual, &mut tmp, 16, shift1);
-    dct16_pass_avx2(&tmp, out, 16, 10);
+    unsafe {
+        let shift1 = 3i32 + bit_depth as i32 - 8;
+        let mut tmp = [0i16; 256];
+        dct16_pass_avx2(residual, &mut tmp, 16, shift1);
+        dct16_pass_avx2(&tmp, out, 16, 10);
+    }
 }
 
 pub fn fwd_dct16_avx2_dispatch(residual: &[i16], out: &mut [i16], bit_depth: u8) {
@@ -1416,101 +1439,103 @@ pub fn fwd_dct16_avx2_dispatch(residual: &[i16], out: &mut [i16], bit_depth: u8)
 /// hierarchy; AVX2 for the 8 EO-term dot8 and 16 O-term dot16 products.
 #[target_feature(enable = "avx2")]
 unsafe fn dct32_pass_avx2(src: &[i16], dst: &mut [i16], line: usize, shift: i32) {
-    let rs = |v: i32| super::super::round_shift(v, shift);
-    for j in 0..line {
-        let s = &src[j * 32..j * 32 + 32];
-        // E/O split: 16 pairs
-        let o0 = s[0] as i32 - s[31] as i32;
-        let e0 = s[0] as i32 + s[31] as i32;
-        let o1 = s[1] as i32 - s[30] as i32;
-        let e1 = s[1] as i32 + s[30] as i32;
-        let o2 = s[2] as i32 - s[29] as i32;
-        let e2 = s[2] as i32 + s[29] as i32;
-        let o3 = s[3] as i32 - s[28] as i32;
-        let e3 = s[3] as i32 + s[28] as i32;
-        let o4 = s[4] as i32 - s[27] as i32;
-        let e4 = s[4] as i32 + s[27] as i32;
-        let o5 = s[5] as i32 - s[26] as i32;
-        let e5 = s[5] as i32 + s[26] as i32;
-        let o6 = s[6] as i32 - s[25] as i32;
-        let e6 = s[6] as i32 + s[25] as i32;
-        let o7 = s[7] as i32 - s[24] as i32;
-        let e7 = s[7] as i32 + s[24] as i32;
-        let o8 = s[8] as i32 - s[23] as i32;
-        let e8 = s[8] as i32 + s[23] as i32;
-        let o9 = s[9] as i32 - s[22] as i32;
-        let e9 = s[9] as i32 + s[22] as i32;
-        let o10 = s[10] as i32 - s[21] as i32;
-        let e10 = s[10] as i32 + s[21] as i32;
-        let o11 = s[11] as i32 - s[20] as i32;
-        let e11 = s[11] as i32 + s[20] as i32;
-        let o12 = s[12] as i32 - s[19] as i32;
-        let e12 = s[12] as i32 + s[19] as i32;
-        let o13 = s[13] as i32 - s[18] as i32;
-        let e13 = s[13] as i32 + s[18] as i32;
-        let o14 = s[14] as i32 - s[17] as i32;
-        let e14 = s[14] as i32 + s[17] as i32;
-        let o15 = s[15] as i32 - s[16] as i32;
-        let e15 = s[15] as i32 + s[16] as i32;
-        // EE/EO split: 8 pairs
-        let ee0 = e0 + e15;
-        let ee1 = e1 + e14;
-        let ee2 = e2 + e13;
-        let ee3 = e3 + e12;
-        let ee4 = e4 + e11;
-        let ee5 = e5 + e10;
-        let ee6 = e6 + e9;
-        let ee7 = e7 + e8;
-        let eo0 = e0 - e15;
-        let eo1 = e1 - e14;
-        let eo2 = e2 - e13;
-        let eo3 = e3 - e12;
-        let eo4 = e4 - e11;
-        let eo5 = e5 - e10;
-        let eo6 = e6 - e9;
-        let eo7 = e7 - e8;
-        // EEE/EEO split: 4 pairs
-        let eee0 = ee0 + ee7;
-        let eee1 = ee1 + ee6;
-        let eee2 = ee2 + ee5;
-        let eee3 = ee3 + ee4;
-        let eeo0 = ee0 - ee7;
-        let eeo1 = ee1 - ee6;
-        let eeo2 = ee2 - ee5;
-        let eeo3 = ee3 - ee4;
-        // EEEE/EEEO split: 2 pairs
-        let eeee0 = eee0 + eee3;
-        let eeee1 = eee1 + eee2;
-        let eeeo0 = eee0 - eee3;
-        let eeeo1 = eee1 - eee2;
-        // DC outputs: freqs 0,16,8,24
-        dst[0 * line + j] = rs(64 * eeee0 + 64 * eeee1);
-        dst[16 * line + j] = rs(64 * eeee0 - 64 * eeee1);
-        dst[8 * line + j] = rs(83 * eeeo0 + 36 * eeeo1);
-        dst[24 * line + j] = rs(36 * eeeo0 - 83 * eeeo1);
-        // EEO dot4 outputs: freqs 4,12,20,28 (scalar, only 16 mults total)
-        for (k, c) in DCT32_EEO_AVX2.iter().enumerate() {
-            let dot = eeo0 * c[0] + eeo1 * c[1] + eeo2 * c[2] + eeo3 * c[3];
-            dst[(4 + k * 8) * line + j] = rs(dot);
-        }
-        // EO dot8 outputs: freqs 2,6,10,...,30 (AVX2 dot8)
-        let eo_ymm = _mm256_set_epi32(eo7, eo6, eo5, eo4, eo3, eo2, eo1, eo0);
-        for (k, coeff) in DCT32_EO_AVX2.iter().enumerate() {
-            let c = _mm256_loadu_si256(coeff.as_ptr() as *const __m256i);
-            let dot = hsum8_i32(_mm256_mullo_epi32(eo_ymm, c));
-            dst[(2 + k * 4) * line + j] = rs(dot);
-        }
-        // O dot16 outputs: freqs 1,3,5,...,31 (AVX2 dot16 using 2 ymm)
-        let o_lo = _mm256_set_epi32(o7, o6, o5, o4, o3, o2, o1, o0);
-        let o_hi = _mm256_set_epi32(o15, o14, o13, o12, o11, o10, o9, o8);
-        for (k, c) in DCT32_O_AVX2.iter().enumerate() {
-            let c_lo = _mm256_loadu_si256(c[0..].as_ptr() as *const __m256i);
-            let c_hi = _mm256_loadu_si256(c[8..].as_ptr() as *const __m256i);
-            let dot = hsum8_i32(_mm256_add_epi32(
-                _mm256_mullo_epi32(o_lo, c_lo),
-                _mm256_mullo_epi32(o_hi, c_hi),
-            ));
-            dst[(1 + k * 2) * line + j] = rs(dot);
+    unsafe {
+        let rs = |v: i32| super::super::round_shift(v, shift);
+        for j in 0..line {
+            let s = &src[j * 32..j * 32 + 32];
+            // E/O split: 16 pairs
+            let o0 = s[0] as i32 - s[31] as i32;
+            let e0 = s[0] as i32 + s[31] as i32;
+            let o1 = s[1] as i32 - s[30] as i32;
+            let e1 = s[1] as i32 + s[30] as i32;
+            let o2 = s[2] as i32 - s[29] as i32;
+            let e2 = s[2] as i32 + s[29] as i32;
+            let o3 = s[3] as i32 - s[28] as i32;
+            let e3 = s[3] as i32 + s[28] as i32;
+            let o4 = s[4] as i32 - s[27] as i32;
+            let e4 = s[4] as i32 + s[27] as i32;
+            let o5 = s[5] as i32 - s[26] as i32;
+            let e5 = s[5] as i32 + s[26] as i32;
+            let o6 = s[6] as i32 - s[25] as i32;
+            let e6 = s[6] as i32 + s[25] as i32;
+            let o7 = s[7] as i32 - s[24] as i32;
+            let e7 = s[7] as i32 + s[24] as i32;
+            let o8 = s[8] as i32 - s[23] as i32;
+            let e8 = s[8] as i32 + s[23] as i32;
+            let o9 = s[9] as i32 - s[22] as i32;
+            let e9 = s[9] as i32 + s[22] as i32;
+            let o10 = s[10] as i32 - s[21] as i32;
+            let e10 = s[10] as i32 + s[21] as i32;
+            let o11 = s[11] as i32 - s[20] as i32;
+            let e11 = s[11] as i32 + s[20] as i32;
+            let o12 = s[12] as i32 - s[19] as i32;
+            let e12 = s[12] as i32 + s[19] as i32;
+            let o13 = s[13] as i32 - s[18] as i32;
+            let e13 = s[13] as i32 + s[18] as i32;
+            let o14 = s[14] as i32 - s[17] as i32;
+            let e14 = s[14] as i32 + s[17] as i32;
+            let o15 = s[15] as i32 - s[16] as i32;
+            let e15 = s[15] as i32 + s[16] as i32;
+            // EE/EO split: 8 pairs
+            let ee0 = e0 + e15;
+            let ee1 = e1 + e14;
+            let ee2 = e2 + e13;
+            let ee3 = e3 + e12;
+            let ee4 = e4 + e11;
+            let ee5 = e5 + e10;
+            let ee6 = e6 + e9;
+            let ee7 = e7 + e8;
+            let eo0 = e0 - e15;
+            let eo1 = e1 - e14;
+            let eo2 = e2 - e13;
+            let eo3 = e3 - e12;
+            let eo4 = e4 - e11;
+            let eo5 = e5 - e10;
+            let eo6 = e6 - e9;
+            let eo7 = e7 - e8;
+            // EEE/EEO split: 4 pairs
+            let eee0 = ee0 + ee7;
+            let eee1 = ee1 + ee6;
+            let eee2 = ee2 + ee5;
+            let eee3 = ee3 + ee4;
+            let eeo0 = ee0 - ee7;
+            let eeo1 = ee1 - ee6;
+            let eeo2 = ee2 - ee5;
+            let eeo3 = ee3 - ee4;
+            // EEEE/EEEO split: 2 pairs
+            let eeee0 = eee0 + eee3;
+            let eeee1 = eee1 + eee2;
+            let eeeo0 = eee0 - eee3;
+            let eeeo1 = eee1 - eee2;
+            // DC outputs: freqs 0,16,8,24
+            dst[0 * line + j] = rs(64 * eeee0 + 64 * eeee1);
+            dst[16 * line + j] = rs(64 * eeee0 - 64 * eeee1);
+            dst[8 * line + j] = rs(83 * eeeo0 + 36 * eeeo1);
+            dst[24 * line + j] = rs(36 * eeeo0 - 83 * eeeo1);
+            // EEO dot4 outputs: freqs 4,12,20,28 (scalar, only 16 mults total)
+            for (k, c) in DCT32_EEO_AVX2.iter().enumerate() {
+                let dot = eeo0 * c[0] + eeo1 * c[1] + eeo2 * c[2] + eeo3 * c[3];
+                dst[(4 + k * 8) * line + j] = rs(dot);
+            }
+            // EO dot8 outputs: freqs 2,6,10,...,30 (AVX2 dot8)
+            let eo_ymm = _mm256_set_epi32(eo7, eo6, eo5, eo4, eo3, eo2, eo1, eo0);
+            for (k, coeff) in DCT32_EO_AVX2.iter().enumerate() {
+                let c = _mm256_loadu_si256(coeff.as_ptr() as *const __m256i);
+                let dot = hsum8_i32(_mm256_mullo_epi32(eo_ymm, c));
+                dst[(2 + k * 4) * line + j] = rs(dot);
+            }
+            // O dot16 outputs: freqs 1,3,5,...,31 (AVX2 dot16 using 2 ymm)
+            let o_lo = _mm256_set_epi32(o7, o6, o5, o4, o3, o2, o1, o0);
+            let o_hi = _mm256_set_epi32(o15, o14, o13, o12, o11, o10, o9, o8);
+            for (k, c) in DCT32_O_AVX2.iter().enumerate() {
+                let c_lo = _mm256_loadu_si256(c[0..].as_ptr() as *const __m256i);
+                let c_hi = _mm256_loadu_si256(c[8..].as_ptr() as *const __m256i);
+                let dot = hsum8_i32(_mm256_add_epi32(
+                    _mm256_mullo_epi32(o_lo, c_lo),
+                    _mm256_mullo_epi32(o_hi, c_hi),
+                ));
+                dst[(1 + k * 2) * line + j] = rs(dot);
+            }
         }
     }
 }
@@ -1518,10 +1543,12 @@ unsafe fn dct32_pass_avx2(src: &[i16], dst: &mut [i16], line: usize, shift: i32)
 /// 2-D forward DCT-32 using AVX2 dot products.
 #[target_feature(enable = "avx2")]
 unsafe fn fwd_dct32_avx2_inner(residual: &[i16], out: &mut [i16], bit_depth: u8) {
-    let shift1 = 4i32 + bit_depth as i32 - 8;
-    let mut tmp = [0i16; 1024];
-    dct32_pass_avx2(residual, &mut tmp, 32, shift1);
-    dct32_pass_avx2(&tmp, out, 32, 11);
+    unsafe {
+        let shift1 = 4i32 + bit_depth as i32 - 8;
+        let mut tmp = [0i16; 1024];
+        dct32_pass_avx2(residual, &mut tmp, 32, shift1);
+        dct32_pass_avx2(&tmp, out, 32, 11);
+    }
 }
 
 pub fn fwd_dct32_avx2_dispatch(residual: &[i16], out: &mut [i16], bit_depth: u8) {

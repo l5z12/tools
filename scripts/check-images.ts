@@ -198,8 +198,10 @@ console.log(
   "HEIC WASM decode, PNG/JPEG conversion, resizing, malformed input, limits, and AVIF routing passed.",
 );
 
-// Independently decode WASM-encoded HEIC/HEIF with FFmpeg. Odd dimensions
+// Prefer libheif in CI: Ubuntu's FFmpeg cannot demux item-based HEIC files.
+// Recent FFmpeg is a fallback on hosts without heif-convert. Odd dimensions
 // exercise HEVC padding and the HEIF display-size metadata.
+const heifConvert = process.env.HEIF_CONVERT ?? Bun.which("heif-convert");
 const outputWidth = 65,
   outputHeight = 49;
 const gradient = new Uint8Array(outputWidth * outputHeight * 4);
@@ -233,29 +235,31 @@ for (const [format, quality] of [
   const file = `.astro/encoded-${quality}.${format}`;
   await writeFile(file, bytes);
   const reference = Bun.spawn(
-    [
-      "ffmpeg",
-      "-hide_banner",
-      "-loglevel",
-      "error",
-      // FFmpeg's automatic HEIF crop rounds odd sizes down for 4:2:0.
-      // Convert to RGBA before applying the exact display rectangle.
-      "-apply_cropping",
-      "0",
-      "-i",
-      file,
-      "-vf",
-      // Use the container's BT.709/full-range nclx (checked above); FFmpeg's
-      // raw HEVC decoder otherwise defaults to BT.601 when SPS VUI omits it.
-      `scale=in_color_matrix=bt709:in_range=full,format=rgba,crop=${outputWidth}:${outputHeight}:0:0:exact=1`,
-      "-frames:v",
-      "1",
-      "-f",
-      "rawvideo",
-      "-pix_fmt",
-      "rgba",
-      "pipe:1",
-    ],
+    heifConvert
+      ? [heifConvert, file, `${file}.png`]
+      : [
+          "ffmpeg",
+          "-hide_banner",
+          "-loglevel",
+          "error",
+          // FFmpeg's automatic HEIF crop rounds odd sizes down for 4:2:0.
+          // Convert to RGBA before applying the exact display rectangle.
+          "-apply_cropping",
+          "0",
+          "-i",
+          file,
+          "-vf",
+          // Use the container's BT.709/full-range nclx (checked above); FFmpeg's
+          // raw HEVC decoder otherwise defaults to BT.601 when SPS VUI omits it.
+          `scale=in_color_matrix=bt709:in_range=full,format=rgba,crop=${outputWidth}:${outputHeight}:0:0:exact=1`,
+          "-frames:v",
+          "1",
+          "-f",
+          "rawvideo",
+          "-pix_fmt",
+          "rgba",
+          "pipe:1",
+        ],
     { stdout: "pipe", stderr: "pipe" },
   );
   const [referencePixels, errors, status] = await Promise.all([
@@ -264,7 +268,20 @@ for (const [format, quality] of [
     reference.exited,
   ]);
   assert.equal(status, 0, errors);
-  const rgba = new Uint8Array(referencePixels);
+  let rgba: Uint8Array;
+  if (heifConvert) {
+    const image = await loadImage(await readFile(`${file}.png`));
+    assert.equal(image.width, outputWidth);
+    assert.equal(image.height, outputHeight);
+    const canvas = createCanvas(outputWidth, outputHeight);
+    const context = canvas.getContext("2d");
+    context.drawImage(image, 0, 0);
+    rgba = new Uint8Array(
+      context.getImageData(0, 0, outputWidth, outputHeight).data,
+    );
+  } else {
+    rgba = new Uint8Array(referencePixels);
+  }
   assert.equal(rgba.length, gradient.length);
   if (quality === 100) {
     const meanError =
@@ -307,5 +324,5 @@ for (const quality of [0, 101])
   assert.throws(() => encode_raster(2, 1, raster, "heic", quality), /Quality/);
 assert.throws(() => encode_raster(2, 2, raster, "heif", 80), /RGBA/);
 console.log(
-  "HEIC/HEIF WASM encoding passed FFmpeg decoding, quality, odd/tiny dimensions, white alpha compositing, and validation.",
+  `HEIC/HEIF WASM encoding passed ${heifConvert ? "libheif" : "FFmpeg"} decoding, quality, odd/tiny dimensions, white alpha compositing, and validation.`,
 );
