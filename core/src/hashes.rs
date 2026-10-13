@@ -6,6 +6,8 @@ use crate::{
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::{json, Value};
 use sha2::Digest;
+// The remaining hash crates still implement digest 0.10.
+use sha3::Digest as _;
 use std::io::Cursor;
 
 const ALGORITHMS: &str = include_str!("../../src/lib/hash-algorithms.json");

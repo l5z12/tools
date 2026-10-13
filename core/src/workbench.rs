@@ -158,7 +158,7 @@ pub fn execute(id: &str, input: &str, bytes: &[u8], options: &str) -> Result<Val
             )
         }
         "hmac-calc" => {
-            use hmac::{Hmac, Mac};
+            use hmac::{Hmac, KeyInit, Mac};
             let key = if option(&opts, "keyFormat", "text") == "hex" {
                 hex::decode(option(&opts, "key", "")).map_err(|e| e.to_string())?
             } else {

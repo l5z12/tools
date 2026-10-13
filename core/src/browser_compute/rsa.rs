@@ -2,13 +2,14 @@
 use crate::workbench::{code, file, option};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use rand::rngs::OsRng;
+// RSA 0.9 requires its own compatible SHA-256 implementation.
+use rsa::sha2::Sha256;
 use rsa::{
     pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey, LineEnding},
     traits::PublicKeyParts,
     Oaep, RsaPrivateKey, RsaPublicKey,
 };
 use serde_json::{json, Value};
-use sha2::Sha256;
 
 fn rsa_payload(input: &str, opts: &Value, decrypt: bool) -> Result<Vec<u8>, String> {
     if decrypt
