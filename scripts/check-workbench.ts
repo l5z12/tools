@@ -667,7 +667,7 @@ assert.equal(
       !everydayIds.has(t.id) &&
       !devInspectIds.has(t.id),
   ).length,
-  19,
+  20,
 );
 assert.equal(workbenchIds.size, workbenchTools.length);
 assert.equal(new Set(tools.map((t) => t.id)).size, tools.length);

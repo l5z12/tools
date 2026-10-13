@@ -23,6 +23,7 @@ mod fingerprints;
 mod hashes;
 mod limits;
 mod output_format;
+mod qr;
 mod rust_tools;
 mod sql_tools;
 pub use fingerprints::fingerprint_hash;

@@ -52,6 +52,12 @@ export async function imageSuite(
       throw Error("Images exceed the pixel limit (8 MP each, 16 MP total).");
   }
   const first = images[0];
+  if (id === "qr-decode")
+    return suiteCore(id, "", first.pixels, {
+      ...o,
+      width: first.width,
+      height: first.height,
+    });
   if (id === "palette-extractor") {
     const count = Number(o.count);
     if (!Number.isInteger(count) || count < 2 || count > 32)
