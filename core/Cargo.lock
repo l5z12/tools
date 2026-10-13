@@ -327,12 +327,12 @@ dependencies = [
 
 [[package]]
 name = "blowfish"
-version = "0.9.1"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e412e2cd0f2b2d93e02543ceae7917b3c70331573df19ee046bcbc35e45e87d7"
+checksum = "62ce3946557b35e71d1bbe07ec385073ce9eda05043f95de134eb578fcf1a298"
 dependencies = [
  "byteorder",
- "cipher 0.4.4",
+ "cipher 0.5.2",
 ]
 
 [[package]]
@@ -418,12 +418,11 @@ dependencies = [
 
 [[package]]
 name = "camellia"
-version = "0.1.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3264e2574e9ef2b53ce6f536dea83a69ac0bc600b762d1523ff83fe07230ce30"
+checksum = "d3ed33f9863ee76491bbe0d7e16a225c694d8525287e320dc7fbe71ee212254c"
 dependencies = [
- "byteorder",
- "cipher 0.4.4",
+ "cipher 0.5.2",
 ]
 
 [[package]]
@@ -1043,11 +1042,11 @@ dependencies = [
 
 [[package]]
 name = "des"
-version = "0.8.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffdd80ce8ce993de27e9f063a444a4d53ce8e8db4c1f00cc03af5ad5a9867a1e"
+checksum = "916a94e407b54f9034d71dd748234cd1e516ced6284009906ae246f177eafe5a"
 dependencies = [
- "cipher 0.4.4",
+ "cipher 0.5.2",
 ]
 
 [[package]]
