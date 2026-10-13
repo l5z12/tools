@@ -402,13 +402,18 @@ mod tests {
             p["text"],
             "120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b"
         );
+        // RFC 5869, Appendix A.3: SHA-256 with empty salt and info.
         let h = execute(
             "crypto-hkdf",
             &"0b".repeat(22),
             &[],
-            &json!({"salt":"000102030405060708090a0b0c","info":"","length":"42"}),
+            &json!({"salt":"","info":"","length":"42"}),
         )
         .unwrap();
         assert_eq!(h["data"]["bytes"], 42);
+        assert_eq!(
+            h["text"],
+            "8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d9d201395faa4b61a96c8"
+        );
     }
 }

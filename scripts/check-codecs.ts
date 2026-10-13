@@ -349,25 +349,31 @@ const rawDelimiter = run(
 );
 assert.equal(contents(rawDelimiter).length, 1);
 const ikm = Buffer.from("input key material");
-const pb = run("crypto-pbkdf2", "password", {
-  salt: salt.toString("hex"),
-  iterations: "1000",
-  length: "48",
-});
-assert.deepEqual(
-  contents(pb),
-  pbkdf2Sync("password", salt, 1000, 48, "sha256"),
-);
+for (const length of [1, 32, 33, 128]) {
+  const password = "password 🌍";
+  const pb = run("crypto-pbkdf2", password, {
+    salt: salt.toString("hex"),
+    iterations: "1000",
+    length: String(length),
+  });
+  assert.deepEqual(
+    contents(pb),
+    pbkdf2Sync(password, salt, 1000, length, "sha256"),
+  );
+  for (const hkdfSalt of [Buffer.alloc(0), salt]) {
+    const info = "context 🌍";
+    const hk = run("crypto-hkdf", ikm.toString("hex"), {
+      salt: hkdfSalt.toString("hex"),
+      info,
+      length: String(length),
+    });
+    assert.deepEqual(
+      contents(hk),
+      Buffer.from(hkdfSync("sha256", ikm, hkdfSalt, info, length)),
+    );
+  }
+}
 exercised.add("crypto-pbkdf2");
-const hk = run("crypto-hkdf", ikm.toString("hex"), {
-  salt: salt.toString("hex"),
-  info: "context",
-  length: "48",
-});
-assert.deepEqual(
-  contents(hk),
-  Buffer.from(hkdfSync("sha256", ikm, salt, "context", 48)),
-);
 exercised.add("crypto-hkdf");
 assert.throws(() =>
   run("crypto-pbkdf2", "password", { salt: "00", iterations: "2000001" }),
