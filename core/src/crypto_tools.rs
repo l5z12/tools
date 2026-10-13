@@ -7,8 +7,6 @@ use aes_gcm::{
     aead::{Aead, Payload},
     KeyInit,
 };
-// DES, Blowfish and Camellia still use cipher 0.4.
-use cbc::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
 use serde_json::{json, Value};
 use sha2::Sha256;
 
@@ -31,21 +29,6 @@ fn transform(
                 cipher.encrypt(iv.into(), payload)
             }
             .map_err(|_| "Authentication failed: check key, nonce, AAD and ciphertext.".to_string())
-        }};
-    }
-    macro_rules! cbc {
-        ($ty:ty) => {{
-            if decrypt {
-                let cipher = cbc::Decryptor::<$ty>::new_from_slices(key, iv)
-                    .map_err(|_| "Invalid key or IV length.")?;
-                cipher
-                    .decrypt_padded_vec_mut::<Pkcs7>(input)
-                    .map_err(|_| "Invalid ciphertext length or PKCS#7 padding.".to_string())
-            } else {
-                let cipher = cbc::Encryptor::<$ty>::new_from_slices(key, iv)
-                    .map_err(|_| "Invalid key or IV length.")?;
-                Ok(cipher.encrypt_padded_vec_mut::<Pkcs7>(input))
-            }
         }};
     }
     macro_rules! ctr {
@@ -71,9 +54,9 @@ fn transform(
         "crypto-chacha20-poly1305" => aead!(chacha20poly1305::ChaCha20Poly1305),
         "crypto-xchacha20-poly1305" => aead!(chacha20poly1305::XChaCha20Poly1305),
         "crypto-aes-cbc" => match key.len() {
-            16 => cbc_modern::<aes::Aes128>(key, iv, input, decrypt),
-            24 => cbc_modern::<aes::Aes192>(key, iv, input, decrypt),
-            32 => cbc_modern::<aes::Aes256>(key, iv, input, decrypt),
+            16 => transform_cbc::<aes::Aes128>(key, iv, input, decrypt),
+            24 => transform_cbc::<aes::Aes192>(key, iv, input, decrypt),
+            32 => transform_cbc::<aes::Aes256>(key, iv, input, decrypt),
             _ => Err("AES key must be 16, 24 or 32 bytes.".into()),
         },
         "crypto-aes-ctr" => match key.len() {
@@ -82,44 +65,41 @@ fn transform(
             32 => ctr!(aes::Aes256),
             _ => Err("AES key must be 16, 24 or 32 bytes.".into()),
         },
-        "crypto-des-cbc" => cbc!(des::Des),
-        "crypto-3des-cbc" => cbc!(des::TdesEde3),
-        "crypto-blowfish-cbc" => cbc!(blowfish::Blowfish),
-        "crypto-twofish-cbc" => cbc_modern::<twofish::Twofish>(key, iv, input, decrypt),
+        "crypto-des-cbc" => transform_cbc::<des::Des>(key, iv, input, decrypt),
+        "crypto-3des-cbc" => transform_cbc::<des::TdesEde3>(key, iv, input, decrypt),
+        "crypto-blowfish-cbc" => transform_cbc::<blowfish::Blowfish>(key, iv, input, decrypt),
+        "crypto-twofish-cbc" => transform_cbc::<twofish::Twofish>(key, iv, input, decrypt),
         "crypto-serpent-cbc" => {
             if ![16, 24, 32].contains(&key.len()) {
                 return Err("Serpent key must be 16, 24 or 32 bytes.".into());
             }
-            cbc_modern::<serpent::Serpent>(key, iv, input, decrypt)
+            transform_cbc::<serpent::Serpent>(key, iv, input, decrypt)
         }
         "crypto-camellia-cbc" => match key.len() {
-            16 => cbc!(camellia::Camellia128),
-            24 => cbc!(camellia::Camellia192),
-            32 => cbc!(camellia::Camellia256),
+            16 => transform_cbc::<camellia::Camellia128>(key, iv, input, decrypt),
+            24 => transform_cbc::<camellia::Camellia192>(key, iv, input, decrypt),
+            32 => transform_cbc::<camellia::Camellia256>(key, iv, input, decrypt),
             _ => Err("Camellia key must be 16, 24 or 32 bytes.".into()),
         },
         _ => Err("Unknown encryption algorithm.".into()),
     }
 }
 
-fn cbc_modern<C>(key: &[u8], iv: &[u8], input: &[u8], decrypt: bool) -> Result<Vec<u8>, String>
+fn transform_cbc<C>(key: &[u8], iv: &[u8], input: &[u8], decrypt: bool) -> Result<Vec<u8>, String>
 where
-    C: cbc02::cipher::BlockCipherEncrypt<BlockSize = cbc02::cipher::consts::U16>
-        + cbc02::cipher::BlockCipherDecrypt
-        + cbc02::cipher::KeyInit,
+    C: cbc::cipher::BlockCipherEncrypt + cbc::cipher::BlockCipherDecrypt + cbc::cipher::KeyInit,
 {
-    use cbc02::cipher::{
-        array::Array, block_padding::Pkcs7, consts::U16, BlockModeDecrypt, BlockModeEncrypt,
-        InnerIvInit,
+    use cbc::cipher::{
+        array::Array, block_padding::Pkcs7, BlockModeDecrypt, BlockModeEncrypt, InnerIvInit,
     };
     let cipher = C::new_from_slice(key).map_err(|_| "Invalid key or IV length.")?;
-    let iv = Array::<u8, U16>::try_from(iv).map_err(|_| "Invalid key or IV length.")?;
+    let iv = Array::<u8, C::BlockSize>::try_from(iv).map_err(|_| "Invalid key or IV length.")?;
     if decrypt {
-        cbc02::Decryptor::inner_iv_init(cipher, &iv)
+        cbc::Decryptor::inner_iv_init(cipher, &iv)
             .decrypt_padded_vec::<Pkcs7>(input)
             .map_err(|_| "Invalid ciphertext length or PKCS#7 padding.".to_string())
     } else {
-        Ok(cbc02::Encryptor::inner_iv_init(cipher, &iv).encrypt_padded_vec::<Pkcs7>(input))
+        Ok(cbc::Encryptor::inner_iv_init(cipher, &iv).encrypt_padded_vec::<Pkcs7>(input))
     }
 }
 
@@ -274,6 +254,99 @@ mod tests {
         );
     }
     #[test]
+    fn cbc_openssl_vectors() {
+        // Node/OpenSSL createCipheriv with PKCS#7 padding and the legacy provider.
+        let plain = b"CBC migration regression";
+        for (id, key_length, block_size, expected) in [
+            (
+                "des-cbc",
+                8,
+                8,
+                "0378cca4761064c5f1b6d6c3131ee9753ea59c9b7e1b00e3e0a1622c90315d33",
+            ),
+            (
+                "3des-cbc",
+                24,
+                8,
+                "e49d656f86a42df0d3f9452a23ca04caafa15661a040558bafc56a34c667dda3",
+            ),
+            (
+                "blowfish-cbc",
+                16,
+                8,
+                "8a6e1f50661a28b747894bfdf481a9adf3defdf89bce48730af945e138552053",
+            ),
+            (
+                "camellia-cbc",
+                16,
+                16,
+                "48e2ab3ef995c9f863add3edd2340668aa08cce8877a68f0f9b25b41db07e5c8",
+            ),
+            (
+                "camellia-cbc",
+                24,
+                16,
+                "be1e12e31b0314d82318cf6c3de99f6904f0b6fedf553117d18134b41d2c6d62",
+            ),
+            (
+                "camellia-cbc",
+                32,
+                16,
+                "575f6c3e6ce46c59ee82413a74012be2f055f82a126a01d73719d6f9970fa89e",
+            ),
+        ] {
+            let id = format!("crypto-{id}");
+            let key: Vec<u8> = (1..=key_length).collect();
+            let iv: Vec<u8> = (0..block_size).collect();
+            let ciphertext = hex::decode(expected).unwrap();
+            assert_eq!(
+                transform(&id, &key, &iv, &[], plain, false).unwrap(),
+                ciphertext,
+                "{id} with {key_length}-byte key"
+            );
+            assert_eq!(
+                transform(&id, &key, &iv, &[], &ciphertext, true).unwrap(),
+                plain,
+                "{id} with {key_length}-byte key"
+            );
+        }
+    }
+    #[test]
+    fn cbc_rejects_invalid_input() {
+        for (id, key_length, block_size) in [
+            ("aes-cbc", 16, 16),
+            ("des-cbc", 8, 8),
+            ("3des-cbc", 24, 8),
+            ("blowfish-cbc", 16, 8),
+            ("twofish-cbc", 32, 16),
+            ("serpent-cbc", 32, 16),
+            ("camellia-cbc", 16, 16),
+        ] {
+            let id = format!("crypto-{id}");
+            let key = vec![7; key_length];
+            let iv = vec![3; block_size];
+            assert!(transform(&id, &[], &iv, &[], &[], false).is_err(), "{id}");
+            assert!(
+                transform(&id, &key, &iv[..block_size - 1], &[], &[], false).is_err(),
+                "{id}"
+            );
+            let ciphertext = transform(&id, &key, &iv, &[], &[], false).unwrap();
+            assert_eq!(ciphertext.len(), block_size, "{id}");
+            assert!(transform(&id, &key, &iv, &[], &[], true).is_err(), "{id}");
+            assert!(
+                transform(&id, &key, &iv, &[], &ciphertext[..block_size - 1], true).is_err(),
+                "{id}"
+            );
+            // Empty plaintext is one padding block; force its last byte to zero.
+            let mut bad_iv = iv;
+            bad_iv[block_size - 1] ^= block_size as u8;
+            assert!(
+                transform(&id, &key, &bad_iv, &[], &ciphertext, true).is_err(),
+                "{id}"
+            );
+        }
+    }
+    #[test]
     fn roundtrips_and_authentication() {
         for (id, k, n) in [
             ("aes-gcm", 16, 12),
@@ -294,6 +367,8 @@ mod tests {
             ("serpent-cbc", 16, 16),
             ("serpent-cbc", 24, 16),
             ("serpent-cbc", 32, 16),
+            ("camellia-cbc", 16, 16),
+            ("camellia-cbc", 24, 16),
             ("camellia-cbc", 32, 16),
         ] {
             let id = format!("crypto-{id}");
