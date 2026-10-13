@@ -53,6 +53,7 @@
     "test:python": "bun scripts/check-python.ts",
     "test:python-analysis": "bun scripts/check-python-analysis.ts",
     "test:python-terminal": "bun scripts/check-python-terminal.ts",
+    "test:qr": "bun scripts/check-qr.ts",
     "test:rar": "bun scripts/check-rar.ts",
     "test:references": "bun scripts/check-references.ts",
     "test:routing": "bun scripts/check-routing.ts",

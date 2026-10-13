@@ -76,6 +76,19 @@ export const workbenchTools: Workbench[] = [
   ...codecTools,
   ...cryptoTools,
   make(
+    "qr-decode",
+    "QR code decoder",
+    "Read text, links and binary payloads from QR codes in a local image.",
+    ["images", "encoding", "web"],
+    "",
+    [],
+    {
+      inputMode: "images",
+      keywords: ["qr", "qrcode", "scan", "reader", "barcode"],
+      help: "Choose a PNG, JPEG, WebP, GIF, BMP, AVIF or HEIC/HEIF image, up to 32 MiB and 8 MP. Finds multiple QR codes. UTF-8 text is shown directly; other payloads are available as binary downloads. Animated images use the first frame. Processing stays in your browser.",
+    },
+  ),
+  make(
     "jwt-verify",
     "JWT verifier",
     "Verify a JWT signature and time, issuer and audience claims using your key.",

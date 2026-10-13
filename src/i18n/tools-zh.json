@@ -2144,6 +2144,11 @@
     "name": "QR 码生成器",
     "description": "创建可扫描的 QR 码并保存为 SVG。"
   },
+  "qr-decode": {
+    "name": "QR 码解码器",
+    "description": "读取本地图像中 QR 码的文本、链接和二进制内容。",
+    "help": "选择 PNG、JPEG、WebP、GIF、BMP、AVIF 或 HEIC/HEIF 图像，最大 32 MiB、800 万像素。支持识别多个 QR 码。直接显示 UTF-8 文本；其他内容可下载为二进制文件。动态图像使用第一帧。所有处理均在浏览器本地完成。"
+  },
   "contrast": {
     "name": "颜色对比度",
     "description": "按 WCAG 2 对比度阈值比较两种颜色。",

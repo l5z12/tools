@@ -100,6 +100,7 @@ oxvg_optimiser = "0.0.5"
 oxvg_ast = { version = "0.0.5", features = ["parse", "roxmltree"] }
 heic = { version = "=0.1.6", default-features = false }
 still265 = { version = "=0.6.0", default-features = false, features = ["std"] }
+rqrr = { version = "0.10.1", default-features = false }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }

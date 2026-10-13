@@ -50,6 +50,7 @@ pub fn execute(id: &str, input: &str, bytes: &[u8], options: &str) -> Result<Val
         input.as_bytes()
     };
     match id {
+        "qr-decode" => crate::qr::decode(bytes, &opts),
         "format-output" => crate::output_format::execute(bytes, &opts),
         "jwt-verify" | "svg-optimizer" | "crypto-keypair" | "crypto-rsa-oaep" | "uuid"
         | "password" | "file-sha256" => crate::browser_compute::execute(id, input, bytes, &opts),
