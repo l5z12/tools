@@ -88,7 +88,7 @@ tiger = "0.2"
 crc32c = "0.6"
 xxhash-rust = { version = "0.8", features = ["xxh32", "xxh64", "xxh3"] }
 murmur3 = "0.5"
-sevenz-rust2 = { version = "0.22.2", default-features = false, features = ["aes256_wasm", "compress", "bzip2", "ppmd", "deflate"] }
+sevenz-rust2 = { version = "0.24.0", default-features = false, features = ["aes256_wasm", "compress", "bzip2", "ppmd", "deflate"] }
 rars = "=0.9.4"
 cpp_demangle = "0.5.1"
 msvc-demangler = "0.11"
