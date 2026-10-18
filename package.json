@@ -74,7 +74,7 @@
     "@types/bun": "^1.4.3",
     "@types/sql.js": "^1.4.11",
     "astro": "^7.3.8",
-    "happy-dom": "^20.14.6",
+    "happy-dom": "^21.0.1",
     "jose": "^6.2.12",
     "prettier": "^3.9.10",
     "prettier-plugin-astro": "^1.1.1",
