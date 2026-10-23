@@ -39,7 +39,7 @@ toml = "0.9"
 miniz_oxide = "0.9"
 crc32fast = "1"
 semver = "1"
-shlex = "1"
+shlex = "2"
 cron = "0.17"
 jsonschema = {version = "0.33", default-features = false}
 hmac = "0.13"
