@@ -49,7 +49,7 @@ sqlparser = {version = "0.58", default-features = false, features = ["std", "ser
 sqlformat = "0.3"
 graphql-parser = "0.4"
 json-patch = "4"
-roxmltree = "0.20"
+roxmltree = "0.21"
 encoding_rs = "0.8"
 zip = { version = "8.6.0", default-features = false, features = ["aes-crypto", "deflate", "deflate-flate2-zlib-rs", "deflate64", "lzma"] }
 tar = "0.4"
